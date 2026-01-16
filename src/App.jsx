@@ -4,6 +4,10 @@ import { Routes, Route } from "react-router-dom";
 import UserLayout from "./pages/UserLayout";
 import AdminLayout from "./pages/AdminLayout";
 
+import Login from "./pages/Login";
+import Signup from "./pages/Signup.jsx"; 
+import OwnerSignup from "./pages/OwnerSignup";
+
 import Home from "./pages/Home";
 import Clubs from "./pages/Clubs";
 import Courts from "./pages/Courts";
@@ -14,9 +18,6 @@ import ReservationSuccess from "./pages/ReservationSuccess";
 import Profile from "./pages/Profile";
 import Contact from "./pages/Contact";
 
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-
 import Admin from "./pages/Admin";
 import AdminClub from "./pages/AdminClub";
 import AdminCourts from "./pages/AdminCourts";
@@ -25,7 +26,6 @@ import AdminReservations from "./pages/AdminReservations";
 import AdminAddReservation from "./pages/AdminAddReservation";
 import AdminReservationDetails from "./pages/AdminReservationDetails";
 import AdminAddCourt from "./pages/AdminAddCourt";
-
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -42,7 +42,7 @@ export default function App() {
   });
 
   const [user, setUser] = useState({
-    id: "1",
+    userId: "1",
     firstName: "Nour",
     lastName: "Abusoud",
     email: "nour@gmail.com",
@@ -55,10 +55,12 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+      
+     <Route path="/login" element={<Login />} />
 
-      {/* User Layout */}
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/admin/signup" element={<OwnerSignup />} />
+
       <Route element={<UserLayout />}>
         <Route path="/" element={<Home />} />
         <Route path="/clubs" element={<Clubs />} />
@@ -118,11 +120,13 @@ export default function App() {
         <Route index element={<Admin />} />
         <Route path="club" element={<AdminClub />} />
         <Route path="courts" element={<AdminCourts />} />
-        <Route path="courts/add" element={<AdminAddCourt />} />
+          <Route path="courts/add" element={<AdminAddCourt />} />
+
         <Route path="courts/:courtId" element={<AdminCourtDetails />} />
         <Route path="reservations" element={<AdminReservations />} />
         <Route path="reservations/add" element={<AdminAddReservation />} />
         <Route path="reservations/:bookingId" element={<AdminReservationDetails />} />
+        
       </Route>
 
       <Route path="*" element={<NotFound />} />
