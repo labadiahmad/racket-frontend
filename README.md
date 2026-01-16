@@ -89,6 +89,60 @@ State in this project is handled entirely on the client side using React Hooks.
 
 ---
 
+## Project Structure
+
+The project follows a clear and modular folder structure to improve readability,
+scalability, and future backend integration.
+
+```txt
+src/
+├── assets/
+│   ├── clubs/            # Club logos and images
+│   ├── courts/           # Court images
+│   ├── hero/             # Hero section images/videos
+│   ├── players/          # Player images
+│   └── tournaments/      # Tournament assets
+│
+├── components/
+│   ├── Navbar.jsx
+│   ├── Footer.jsx
+│   ├── AdminNav.jsx
+│   ├── navbar.css
+│   └── footer.css
+│
+├── pages/
+│   ├── Home.jsx
+│   ├── Clubs.jsx
+│   ├── ClubDetails.jsx
+│   ├── Courts.jsx
+│   ├── CourtDetails.jsx
+│   ├── ConfirmReservation.jsx
+│   ├── ReservationSuccess.jsx
+│   ├── Profile.jsx
+│   ├── Login.jsx
+│   ├── Signup.jsx
+│   ├── OwnerSignup.jsx
+│   ├── NotFound.jsx
+│   │
+│   ├── Admin.jsx
+│   ├── AdminLayout.jsx
+│   ├── AdminClub.jsx
+│   ├── AdminCourts.jsx
+│   ├── AdminCourtDetails.jsx
+│   ├── AdminReservations.jsx
+│   ├── AdminAddCourt.jsx
+│   ├── AdminAddReservation.jsx
+│   │
+│   └── (Each page has its own CSS file)
+│
+├── App.jsx               # Main routing and shared state
+├── App.css
+├── main.jsx              # Application entry point
+└── index.css             # Global styles
+```
+
+---
+
 ## Routing Structure
 
 Client-side routing is implemented using **React Router DOM**.
@@ -112,54 +166,6 @@ Client-side routing is implemented using **React Router DOM**.
 - `/admin/courts/:courtId` – Court details
 - `/admin/reservations` – Reservations list
 - `/admin/reservations/add` – Add reservation manually
-
----
-
-## Project Structure
-
-The project follows a clear and modular folder structure to improve readability, scalability, and future backend integration.
-
-src/
-│
-├── assets/                # Images, icons, and media files
-│   ├── clubs/
-│   ├── courts/
-│   ├── hero/
-│   └── players/
-│
-├── components/            # Reusable UI components
-│   ├── Navbar.jsx
-│   ├── Footer.jsx
-│   ├── AdminNav.jsx
-│   └── corresponding CSS files
-│
-├── pages/                 # Application pages
-│   ├── Home.jsx
-│   ├── Clubs.jsx
-│   ├── ClubDetails.jsx
-│   ├── Courts.jsx
-│   ├── CourtDetails.jsx
-│   ├── ConfirmReservation.jsx
-│   ├── ReservationSuccess.jsx
-│   ├── Profile.jsx
-│   ├── Login.jsx
-│   ├── Signup.jsx
-│   ├── OwnerSignup.jsx
-│   ├── Admin.jsx
-│   ├── AdminLayout.jsx
-│   ├── AdminClub.jsx
-│   ├── AdminCourts.jsx
-│   ├── AdminCourtDetails.jsx
-│   ├── AdminReservations.jsx
-│   ├── AdminAddCourt.jsx
-│   ├── AdminAddReservation.jsx
-│   └── NotFound.jsx
-│
-├── App.jsx                # Main routing and shared state
-├── main.jsx               # Application entry point
-├── index.css              # Global styles
-
-Each page has its own dedicated CSS file to keep styles isolated and maintainable.
 
 ---
 
