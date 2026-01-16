@@ -13,6 +13,10 @@ import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 
+import ConfirmReservation from "./pages/ConfirmReservation";
+import ReservationSuccess from "./pages/ReservationSuccess";
+import Profile from "./pages/Profile";
+
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -37,6 +41,8 @@ export default function App() {
     city: "Amman",
     photo: "",
   });
+
+  const [reservations, setReservations] = useState([]);
 
   return (
     <Routes>
@@ -67,6 +73,30 @@ export default function App() {
               user={user}
               reservationDraft={reservationDraft}
               setReservationDraft={setReservationDraft}
+            />
+          }
+        />
+
+        <Route
+          path="/confirm-reservation"
+          element={
+            <ConfirmReservation
+              reservationDraft={reservationDraft}
+              setReservations={setReservations}
+              user={user}
+            />
+          }
+        />
+
+        <Route path="/reservation-success" element={<ReservationSuccess />} />
+
+        <Route
+          path="/profile"
+          element={
+            <Profile
+              user={user}
+              setUser={setUser}
+              reservations={reservations}
             />
           }
         />
