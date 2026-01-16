@@ -180,9 +180,13 @@ Each page has its own dedicated CSS file to keep styles isolated and maintainabl
 ## Notes
 
 -This is a frontend-only application	
+
 -All data is currently handled on the client side
+
 -No backend or database is connected yet
+
 -Authentication is simulated for UI and flow demonstration
+
 -The project structure is prepared for easy backend integration in the future
 
 ---
@@ -190,5 +194,7 @@ Each page has its own dedicated CSS file to keep styles isolated and maintainabl
 ## Author
 
 **Developed by: Ahmad Labadi**
+
 **Course: Special Topics in Computer Science**
+
 **Academic Year: 2025 / 2026**
