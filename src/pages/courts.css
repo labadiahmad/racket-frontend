@@ -1,0 +1,436 @@
+:root{
+  --navy:#152233;
+  --text:#0f172a;
+  --line:rgba(15,23,42,.12);
+  --glass: rgba(255,255,255,.70);
+  --shadow: 0 18px 40px rgba(15,23,42,.10);
+}
+
+
+.crt-page{
+  min-height: 100vh;
+  background:#fff;
+  padding: 120px 0 80px;
+  background-image:
+    radial-gradient(1100px 520px at 55% -180px, rgba(21,34,51,.10), transparent 60%);
+}
+
+.crt-container{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 18px;
+}
+
+.crt-topbar{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 26px;
+}
+
+.crt-search{
+  flex: 1;
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 999px;
+
+  background: var(--glass);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.crt-search-ic{
+  opacity: .55;
+  margin-left: 6px;
+  font-size: 14px;
+}
+
+.crt-search input{
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.crt-search input::placeholder{
+  color: rgba(15,23,42,.45);
+  font-weight: 700;
+}
+
+.crt-search-btn{
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 0;
+  cursor: pointer;
+
+  color: #fff;
+  font-weight: 950;
+  background: linear-gradient(180deg, #1e2f45, #0f1d2d);
+  box-shadow: 0 14px 26px rgba(21,34,51,.22);
+}
+
+.crt-filterWrap{ position: relative; }
+
+.crt-filter{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 999px;
+
+  background: var(--glass);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+
+  font-weight: 950;
+  cursor: pointer;
+    color: var(--text);         
+
+}
+
+.crt-filter-ic{ opacity: .7; }
+
+.crt-filterPop{
+  position:absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  padding: 14px;
+  border-radius: 18px;
+  z-index: 50;
+
+  background: rgba(255,255,255,.78);
+  border: 1px solid rgba(15,23,42,.12);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  box-shadow: 0 30px 80px rgba(15,23,42,.18);
+  animation: crtPop .14s ease-out;
+}
+
+@keyframes crtPop{
+  from { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.crt-filterTop{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.crt-filterTitle{
+  font-weight: 980;
+  color: var(--navy);
+  font-size: 13px;
+}
+
+.crt-x{
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 950;
+  color: rgba(15,23,42,.55);
+}
+
+.crt-filterGroup{ margin-bottom: 12px; }
+
+.crt-filterLabel{
+  font-size: 12px;
+  color: rgba(15,23,42,.65);
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.crt-chipRow{
+  display:flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.crt-dateInput{
+  color: #0f172a;
+  background: rgba(255,255,255,.75);
+}
+
+.crt-dateInput::-webkit-calendar-picker-indicator{
+  filter: invert(0);      
+  opacity: .8;
+  cursor: pointer;
+}.crt-clear{
+  color: #0f172a;         
+}
+
+.crt-clear:hover{
+  color: #0f172a;
+}
+.crt-chip{
+  border: 1px solid rgba(15,23,42,.12);
+  background: rgba(255,255,255,.58);
+  border-radius: 999px;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 12px;
+  color: #0f172a;
+  transition: .15s ease;
+}
+
+.crt-chip:hover{ transform: translateY(-1px); }
+
+.crt-chip.active{
+  background: linear-gradient(180deg, #1e2f45, #0f1d2d);
+  color: #fff;
+  border-color: transparent;
+}
+
+.crt-filterDivider{
+  height: 1px;
+  background: rgba(15,23,42,.10);
+  margin: 12px 0;
+}
+
+.crt-filterActions{
+  display:flex;
+  gap: 10px;
+}
+
+.crt-clear{
+  flex: 1;
+  border-radius: 14px;
+  border: 1px solid rgba(15,23,42,.12);
+  background: rgba(255,255,255,.60);
+  padding: 10px 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.crt-done{
+  flex: 1;
+  border-radius: 14px;
+  border: 0;
+  background: linear-gradient(180deg, #1e2f45, #0f1d2d);
+  color: #fff;
+  padding: 10px 12px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.crt-grid{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 26px;
+}
+
+.crt-card{
+  border-radius: 28px;
+  overflow:hidden;
+  transition: transform .18s ease, box-shadow .18s ease;
+    cursor: pointer;
+
+}
+
+.crt-card:hover{
+  transform: translateY(-6px);
+  box-shadow: 0 34px 90px rgba(15,23,42,.14);
+}
+
+.crt-cover{
+  height: 520px;
+  border-radius: 28px;
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(15,23,42,.10);
+}
+
+.crt-dim{
+  position:absolute;
+  inset:0;
+  background:
+    radial-gradient(900px 380px at 50% 20%, rgba(0,0,0,.18), transparent 55%),
+    linear-gradient(to bottom, rgba(0,0,0,.08), rgba(0,0,0,.45));
+}
+
+.crt-top{
+  position:absolute;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  z-index: 2;
+  text-align:center;
+}
+
+.crt-title{
+  font-weight: 950;
+  color: rgba(255,255,255,.96);
+  font-size: 20px;
+  text-shadow: 0 14px 28px rgba(0,0,0,.35);
+}
+
+.crt-sub{
+  margin-top: 6px;
+  font-weight: 850;
+  color: rgba(255,255,255,.90);
+  font-size: 14px;
+  text-shadow: 0 14px 28px rgba(0,0,0,.30);
+}
+
+.crt-bottom{
+  position:absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2;
+
+  display:flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.crt-pill{
+  display:inline-flex;
+  align-items:center;
+  gap: 10px;
+
+  padding: 12px 18px;
+  border-radius: 999px;
+
+  background: rgba(255,255,255,.40);
+  border: 1px solid rgba(255,255,255,.35);
+
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+
+  color: rgba(255,255,255,.95);
+  font-weight: 900;
+  font-size: 14px;
+
+  box-shadow: 0 18px 40px rgba(0,0,0,.18);
+}
+
+.crt-ic{ opacity: .95; }
+
+.crt-empty{
+  margin-top: 18px;
+  padding: 22px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.75);
+  border: 1px solid rgba(15,23,42,.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+  text-align:center;
+}
+
+.crt-emptyTitle{
+  font-weight: 980;
+  color: var(--navy);
+  font-size: 16px;
+}
+
+.crt-emptySub{
+  margin-top: 6px;
+  font-weight: 800;
+  color: rgba(15,23,42,.65);
+  font-size: 13px;
+}
+.crt-dateRow{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.crt-dateField{
+  display:flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crt-dateSmall{
+  font-size: 11px;
+  font-weight: 900;
+  color: rgba(15,23,42,.60);
+}
+
+.crt-dateInput{
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(15,23,42,.12);
+  background: rgba(255,255,255,.65);
+  padding: 0 12px;
+  font-weight: 700;
+  color: #0f172a;
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.crt-dateInput:focus{
+  outline: none;
+  border-color: rgba(21,34,51,.35);
+  box-shadow: 0 10px 22px rgba(15,23,42,.10);
+}
+
+.crt-dateHint{
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: rgba(15,23,42,.55);
+}
+
+
+
+@media (max-width: 992px){
+  .crt-grid{ grid-template-columns: repeat(2, 1fr); }
+  .crt-cover{ height: 480px; }
+}
+
+@media (max-width: 560px){
+  .crt-topbar{ flex-direction: column; align-items: stretch; }
+  .crt-grid{ grid-template-columns: 1fr; }
+  .crt-cover{ height: 440px; }
+  .crt-filterPop{ width: min(340px, 92vw); }
+}
+
+.crt-filterPop .crt-dateInput{
+  color-scheme: light;             
+  background: #fff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(15,23,42,.12) !important;
+}
+
+.crt-filterPop .crt-dateInput::-webkit-datetime-edit,
+.crt-filterPop .crt-dateInput::-webkit-datetime-edit-fields-wrapper,
+.crt-filterPop .crt-dateInput::-webkit-datetime-edit-text,
+.crt-filterPop .crt-dateInput::-webkit-datetime-edit-month-field,
+.crt-filterPop .crt-dateInput::-webkit-datetime-edit-day-field,
+.crt-filterPop .crt-dateInput::-webkit-datetime-edit-year-field{
+  color: #0f172a !important;
+}
+
+.crt-filterPop .crt-dateInput::-webkit-calendar-picker-indicator{
+  opacity: .85 !important;
+  filter: none !important;
+}
+
+.crt-filterPop .crt-clear{
+  color: #0f172a !important;
+  opacity: 1 !important;
+}
