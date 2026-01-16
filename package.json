@@ -1,5 +1,5 @@
 {
-  "name": "react-frontend",
+  "name": "racket-v2",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "bootstrap": "^5.3.8",
-    "react": "^18.2.0",
+    "react": "^19.2.3",
     "react-bootstrap": "^2.10.10",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.26.2"
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.11.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
