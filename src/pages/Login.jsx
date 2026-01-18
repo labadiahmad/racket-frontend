@@ -2,19 +2,41 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./login.css";
 import logo from "../assets/clubs/racket.png";
+import { apiFetch } from "../api";
 
 export default function Login() {
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({ email: "", password: "", remember: true });
+  const [form, setForm] = useState({
+    email: "",
+    password: "",
+    remember: true,
+  });
+
   const [showPass, setShowPass] = useState(false);
 
-  const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
+  const onChange = (key, value) =>
+    setForm((prev) => ({ ...prev, [key]: value }));
 
-  const onSubmit = (e) => {
+  async function handleLogin(e) {
     e.preventDefault();
-    navigate("/clubs");
-  };
+
+    try {
+      const data = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+        }),
+      });
+
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      navigate("/clubs");
+    } catch (err) {
+      alert(err.message || "Login failed");
+    }
+  }
 
   return (
     <div className="rk-login2">
@@ -74,7 +96,7 @@ export default function Login() {
           </div>
         </aside>
 
-        {/* RIGHT (Form) */}
+        {/* RIGHT */}
         <main className="rk-right2">
           <div className="rk-formCard2">
             <Link className="rk-backTop2" to="/">
@@ -88,7 +110,7 @@ export default function Login() {
               </div>
             </div>
 
-            <form className="rk-form2" onSubmit={onSubmit}>
+            <form className="rk-form2" onSubmit={handleLogin}>
               <div className="rk-field2">
                 <label>Email</label>
                 <input
@@ -114,7 +136,6 @@ export default function Login() {
                     className="rk-eye2"
                     type="button"
                     onClick={() => setShowPass((v) => !v)}
-                    aria-label={showPass ? "Hide password" : "Show password"}
                   >
                     {showPass ? "🙈" : "👁️"}
                   </button>
@@ -126,7 +147,9 @@ export default function Login() {
                   <input
                     type="checkbox"
                     checked={form.remember}
-                    onChange={(e) => onChange("remember", e.target.checked)}
+                    onChange={(e) =>
+                      onChange("remember", e.target.checked)
+                    }
                   />
                   <span>Remember me</span>
                 </label>
@@ -134,7 +157,7 @@ export default function Login() {
                 <button
                   className="rk-link2"
                   type="button"
-                  onClick={() => alert("Later: forgot password")}
+                  onClick={() => alert("Later")}
                 >
                   Forgot password?
                 </button>

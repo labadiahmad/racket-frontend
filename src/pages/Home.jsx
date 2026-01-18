@@ -1,9 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-import redCourt from "../assets/courts/redCourt.jpeg";
-import uebnCourt from "../assets/courts/SCR-20251203-uebn.jpeg";
-import wepadelCourt from "../assets/courts/wepadel-court-cover.jpg";
+import { apiFetch } from "../api";
 
 import laithImg from "../assets/players/laith.jpg";
 import saraImg from "../assets/players/sara.jpg";
@@ -11,130 +8,75 @@ import omarImg from "../assets/players/omar.jpg";
 
 import starIcon from "../assets/clubs/star.png";
 import heroVideo from "../assets/hero/vid1.mp4";
-import club364 from "../assets/clubs/364.png";
-import tropico from "../assets/clubs/tropico.png";
-import projectPadel from "../assets/clubs/project-padel.png";
-import wepadelLogo from "../assets/clubs/2.png";
 
 import "./home.css";
 
 export default function Home() {
   const navigate = useNavigate();
 
-  // ===== Search =====
   const [homeLocation, setHomeLocation] = useState("Khalda");
   const [homeDate, setHomeDate] = useState("");
   const [homeType, setHomeType] = useState("All");
 
   const onHomeSearch = () => {
-  const params = new URLSearchParams();
-
+    const params = new URLSearchParams();
     if (homeLocation && homeLocation !== "All") params.set("location", homeLocation);
     if (homeDate) params.set("date", homeDate);
     if (homeType && homeType !== "All") params.set("type", homeType);
-
     navigate(`/courts?${params.toString()}`);
   };
 
-  // ===== Data =====
-  const courts = [
-    {
-      clubId: "1",
-      courtId: "court1",
-      name: "Tropico Padel Club",
-      type: "Outdoor",
-      img: redCourt,
-      location: "Khalda",
-      date: "Sun, 22/05/2025",
-    },
-    {
-      clubId: "2",
-      courtId: "court1",
-      name: "Project Padel",
-      type: "Indoor",
-      img: uebnCourt,
-      location: "KHBP",
-      date: "Sun, 22/05/2025",
-    },
-    {
-      clubId: "3",
-      courtId: "court1",
-      name: "WePadel",
-      type: "Outdoor",
-      img: wepadelCourt,
-      location: "Khalda",
-      date: "Sun, 22/05/2025",
-    },
-        { clubId: "4", 
-          courtId: "court2", 
-          name: "Tropico Padel Club",
-           type: "Indoor", 
-           img: redCourt, 
-           location: "Khalda", 
-           date: "Tue, 24/05/2025" },
+  const [courts, setCourts] = useState([]);
+  const [featuredClubs, setFeaturedClubs] = useState([]);
 
-  ];
+  const API_BASE = "http://localhost:5050";
+  const fixUrl = (url) => {
+    if (!url) return "";
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    if (url.startsWith("/uploads")) return API_BASE + url; // <-- fix here
+    return url;
+  };
 
-  const featuredClubs = [
-    {
-      id: "1",
-      name: "Tropico Padel Club",
-      cover: redCourt,
-      logo: tropico,
-      location: "Marat St",
-      rating: 4.9,
-      reviews: 120,
-    },
-    {
-      id: "2",
-      name: "Project Padel",
-      cover: uebnCourt,
-      logo: projectPadel,
-      location: "KHBP",
-      rating: 3,
-      reviews: 83,
-    },
-        { id: "3", 
-          name: "WePadel", 
-          cover: wepadelCourt, 
-          logo: wepadelLogo, 
-          location: "Khalda", 
-          rating: 4.2, 
-          reviews: 61 },
+  useEffect(() => {
+    async function loadHomeData() {
+      try {
+        const clubsData = await apiFetch("/clubs");
+        const courtsData = await apiFetch("/courts");
 
-    {
-      id: "4",
-      name: "364 Sports Club",
-      cover: wepadelCourt,
-      logo: club364,
-      location: "Madaba",
-      rating: 4.6,
-      reviews: 130,
-    },
-  ];
+        setFeaturedClubs(
+          (clubsData || []).map((c) => ({
+            id: String(c.club_id),
+            name: c.name,
+            cover: fixUrl(c.cover_url),
+            logo: fixUrl(c.logo_url),
+            location: c.address || c.city || "",
+            rating: Math.round(Number(c.avg_rating ?? c.club_rating ?? 0)) || 0,
+            reviews: Number(c.reviews_count ?? c.club_reviews ?? 0) || 0,
+          }))
+        );
+
+        setCourts(
+          (courtsData || []).map((ct) => ({
+            clubId: String(ct.club_id),
+            courtId: String(ct.court_id),
+            name: ct.club_name || ct.name,
+            type: ct.type || ct.court_type || "",
+            img: fixUrl(ct.cover_url || ct.image_url || ""),
+            location: ct.club_address || ct.club_city || "",
+          }))
+        );
+      } catch (err) {
+        console.error("Home API error:", err);
+      }
+    }
+
+    loadHomeData();
+  }, []);
 
   const testimonials = [
-    {
-      name: "Laith M.",
-      role: "Player",
-      rating: 5,
-      img: laithImg,
-      text: "I booked a court at Tropico using this website and it was super easy. The reservation system is fast and the court was perfect.",
-    },
-    {
-      name: "Sara A.",
-      role: "Beginner",
-      rating: 5,
-      img: saraImg,
-      text: "The UI is clean and premium. I found an indoor court and booked it in minutes. Smooth experience.",
-    },
-    {
-      name: "Omar H.",
-      role: "Competitive",
-      rating: 5,
-      img: omarImg,
-      text: "Tournaments are organized and easy to join. I like seeing the level, date, and fee directly.",
-    },
+    { name: "Laith M.", role: "Player", rating: 5, img: laithImg, text: "I booked a court at Tropico using this website and it was super easy." },
+    { name: "Sara A.", role: "Beginner", rating: 5, img: saraImg, text: "The UI is clean and premium. Smooth experience." },
+    { name: "Omar H.", role: "Competitive", rating: 5, img: omarImg, text: "Tournaments are organized and easy to join." },
   ];
 
   const [tIndex, setTIndex] = useState(0);
@@ -150,15 +92,8 @@ export default function Home() {
   const courtsPages = Math.max(1, Math.ceil(courts.length / COURTS_PER_PAGE));
   const clubsPages = Math.max(1, Math.ceil(featuredClubs.length / CLUBS_PER_PAGE));
 
-  const courtsView = courts.slice(
-    courtsPage * COURTS_PER_PAGE,
-    courtsPage * COURTS_PER_PAGE + COURTS_PER_PAGE
-  );
-
-  const clubsView = featuredClubs.slice(
-    clubsPage * CLUBS_PER_PAGE,
-    clubsPage * CLUBS_PER_PAGE + CLUBS_PER_PAGE
-  );
+  const courtsView = courts.slice(courtsPage * COURTS_PER_PAGE, courtsPage * COURTS_PER_PAGE + COURTS_PER_PAGE);
+  const clubsView = featuredClubs.slice(clubsPage * CLUBS_PER_PAGE, clubsPage * CLUBS_PER_PAGE + CLUBS_PER_PAGE);
 
   const prevCourts = () => setCourtsPage((p) => (p - 1 + courtsPages) % courtsPages);
   const nextCourts = () => setCourtsPage((p) => (p + 1) % courtsPages);
@@ -299,9 +234,7 @@ export default function Home() {
                     <span className="rk-chip">
                       <span className="rk-chip-ic">📍</span> {c.location}
                     </span>
-                    <span className="rk-chip">
-                      <span className="rk-chip-ic">🗓️</span> {c.date}
-                    </span>
+                   
                   </div>
                 </div>
               </article>

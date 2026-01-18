@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./signup.css";
 import logo from "../assets/clubs/racket.png";
+import { apiFetch } from "../api";
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -19,18 +20,37 @@ export default function Signup() {
 
   const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
-  const onSubmit = (e) => {
-    e.preventDefault();
+  const onSubmit = async (e) => {
+  e.preventDefault();
 
-    if (form.password !== form.confirmPassword) {
-      alert("Passwords do not match.");
-      return;
-    }
+  if (form.password !== form.confirmPassword) {
+    alert("Passwords do not match.");
+    return;
+  }
 
-    console.log("SIGNUP", form);
+  if (!form.agree) {
+    alert("You must agree to the terms.");
+    return;
+  }
+
+  try {
+   await apiFetch("/auth/signup", {
+  method: "POST",
+  body: JSON.stringify({
+    full_name: form.fullName,
+    email: form.email,
+    password: form.password,
+    role: "user",
+  }),
+});
+
+    alert("Account created successfully");
     navigate("/login");
-  };
-
+  } catch (err) {
+    alert(err.message);
+  }
+};
+ 
   return (
     <div className="rk-auth">
       <div className="rk-authShell">
