@@ -485,11 +485,12 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                     {courtType} • <span className="ct-subLink">{club.name}</span>
                   </div>
                 </div>
-
+                {/* 
                 <div className="ct-priceBox">
                   <div className="ct-priceTop">💰 From</div>
                   <div className="ct-priceVal">{Number(court.price_from || court.priceFrom || 0)} JD</div>
                 </div>
+                */}
               </div>
 
               <p className="ct-text">{courtAbout || "No description yet."}</p>
@@ -597,8 +598,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                       </div>
 
                       <div className="ct-otherSub">
-                        {c.court_type || c.type || "Court"} •{" "}
-                        <strong>from {Number(c.price_from || c.priceFrom || 0)} JD</strong>
+                        {c.court_type || c.type || "Court"} 
                       </div>
                     </div>
                   </div>

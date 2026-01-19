@@ -106,21 +106,19 @@ export default function App() {
         <Route path="/courts" element={<Courts />} />
         <Route path="/contact" element={<Contact />} />
 
-        <Route
-          path="/profile"
-          element={
-            user ? (
-              <Profile
-                user={user}
-                setUser={setUser}
-                reservations={reservations}
-                setReservations={setReservations}
-              />
-            ) : (
-              <Navigate to="/login" replace />
-            )
-          }
-        />
+       <Route
+  path="/profile"
+  element={
+    user ? (
+      <Profile
+        user={user}
+        setUser={setUser}
+      />
+    ) : (
+      <Navigate to="/login" replace />
+    )
+  }
+/>
 
         <Route
           path="/clubs/:id"
