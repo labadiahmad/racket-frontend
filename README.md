@@ -203,4 +203,3 @@ Client-side routing is implemented using **React Router DOM**.
 
 **Course: Special Topics in Computer Science**
 
-**Academic Year: 2025 / 2026**
