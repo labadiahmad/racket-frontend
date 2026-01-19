@@ -186,6 +186,7 @@ const logout = () => {
   if (typeof setUser === "function") setUser(null);
 
   navigate("/", { replace: true });
+   window.location.reload();
 };
   async function deleteReservation(reservationId) {
   if (!reservationId) return;

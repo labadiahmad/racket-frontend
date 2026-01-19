@@ -19,34 +19,49 @@ export default function Login({ setUser, setOwner }) {
   const onChange = (key, value) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  async function handleLogin(e) {
-    e.preventDefault();
+ async function handleLogin(e) {
+  e.preventDefault();
 
-    try {
-      const res = await fetch(`${API}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: form.email,
-          password: form.password,
-        }),
-      });
+  try {
+    const res = await fetch(`${API}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: form.email,
+        password: form.password,
+      }),
+    });
 
-      const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        alert(data.message || data.error || "Login failed");
-        return;
-      }
-
-      localStorage.setItem("user", JSON.stringify(data.user));
-setUser?.(data.user);  
-navigate("/");
-    } catch {
-      alert("Server error");
+    if (!res.ok) {
+      alert(data.message || data.error || "Login failed");
+      return;
     }
-  }
 
+    // after successful response:
+const logged = data.user || data;
+const role = String(logged?.role || "user").toLowerCase();
+
+localStorage.removeItem("user");
+localStorage.removeItem("owner");
+localStorage.removeItem("ownerOnboarding");
+
+if (role === "owner") {
+  localStorage.setItem("owner", JSON.stringify(logged));
+  setOwner?.(logged);
+  setUser?.(null);
+  navigate("/admin");
+} else {
+  localStorage.setItem("user", JSON.stringify(logged));
+  setUser?.(logged);
+  setOwner?.(null);
+  navigate("/");
+}
+  } catch {
+    alert("Server error");
+  }
+}
   return (
     <div className="rk-login2">
       <div className="rk-shell2">

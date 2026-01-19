@@ -1,381 +1,444 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./ownerSignup.css";
-import logo from "../assets/clubs/racket.png";
 
-export default function OwnerSignup() {
-  const navigate = useNavigate();
+const API_BASE = import.meta.env.VITE_API_URL;
+const API = `${API_BASE}/api`;
 
+export default function OwnerSignup({ setOwner }) {
+    const navigate = useNavigate();
+
+  // steps: 1 = owner account, 2 = club info
   const [step, setStep] = useState(1);
 
-  const [owner, setOwner] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    password: "",
-    confirmPassword: "",
+  // STEP 1 (owner)
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+
+  // STEP 2 (club)
+  const [clubName, setClubName] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [lat, setLat] = useState("");
+  const [lon, setLon] = useState("");
+  const [mapsUrl, setMapsUrl] = useState("");
+  const [clubPhone, setClubPhone] = useState("");
+  const [about, setAbout] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  function safeJsonParse(raw) {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  function getOwnerFromLS() {
+    const raw = localStorage.getItem("owner");
+    return raw ? safeJsonParse(raw) : null;
+  }
+
+  function ownerHeaders() {
+    const o = getOwnerFromLS();
+    return {
+      "Content-Type": "application/json",
+      ...(o?.user_id ? { "x-user-id": String(o.user_id) } : {}),
+      ...(o?.role ? { "x-role": String(o.role) } : { "x-role": "owner" }),
+    };
+  }
+
+ async function apiPost(path, body, headers = {}) {
+  const res = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(body),
   });
 
-  const [club, setClub] = useState({
-    name: "",
-    city: "",
-    address: "",
-    phone: "",
-    whatsapp: "",
-    mapsUrl: "",
-  });
+  const data = await res.json().catch(() => ({}));
 
-  const [showPass, setShowPass] = useState(false);
+  if (!res.ok) {
+    const msg =
+      data.message ||
+      data.error ||
+      data.detail || // sometimes postgres detail comes here
+      "Request failed";
 
-  const onOwnerChange = (key, value) => setOwner((p) => ({ ...p, [key]: value }));
-  const onClubChange = (key, value) => setClub((p) => ({ ...p, [key]: value }));
+    // friendly message for duplicate id / duplicate email
+    if (
+      String(msg).toLowerCase().includes("duplicate") ||
+      String(msg).toLowerCase().includes("unique constraint")
+    ) {
+      throw new Error("This account already exists. Try logging in instead.");
+    }
 
-  const passwordStrength = useMemo(() => {
-    const p = owner.password || "";
-    let score = 0;
-    if (p.length >= 8) score++;
-    if (/[A-Z]/.test(p)) score++;
-    if (/[0-9]/.test(p)) score++;
-    if (/[^A-Za-z0-9]/.test(p)) score++;
-    return score; 
-  }, [owner.password]);
+    throw new Error(msg);
+  }
 
-  const strengthLabel = useMemo(() => {
-    if (passwordStrength <= 1) return "Weak";
-    if (passwordStrength === 2) return "Okay";
-    if (passwordStrength === 3) return "Good";
-    return "Strong";
-  }, [passwordStrength]);
+  return data;
+}
 
-  const canGoNext = useMemo(() => {
-    return (
-      owner.firstName.trim() &&
-      owner.lastName.trim() &&
-      owner.email.trim() &&
-      owner.phone.trim() &&
-      owner.password.trim() &&
-      owner.confirmPassword.trim() &&
-      owner.password === owner.confirmPassword
-    );
-  }, [owner]);
-
-  const canFinish = useMemo(() => {
-    return club.name.trim() && club.city.trim() && club.address.trim() && club.phone.trim();
-  }, [club]);
-
-  const goNext = (e) => {
+  // =========================
+  // STEP 1: CREATE OWNER
+  // =========================
+  async function submitOwner(e) {
     e.preventDefault();
-    if (!canGoNext) return;
-    setStep(2);
-  };
+    setErr("");
 
-  const goBack = () => setStep(1);
+    const payload = {
+      full_name: fullName.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      password,
+      role: "owner",
+    };
 
-  const finish = (e) => {
+    if (!payload.full_name || !payload.email || !payload.phone || !payload.password) {
+      setErr("Please fill all required fields.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const data = await apiPost("/auth/signup", payload);
+
+      const owner = data.user || data;
+
+       localStorage.setItem("owner", JSON.stringify(owner));
+        localStorage.removeItem("user");
+        localStorage.setItem("ownerOnboarding", "1"); 
+        setOwner?.(owner);
+        setStep(2);
+
+    } catch (e2) {
+      setErr(e2.message || "Signup failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // =========================
+  // STEP 2: CREATE CLUB
+  // =========================
+  async function submitClub(e) {
     e.preventDefault();
-    if (!canFinish) return;
+    setErr("");
 
-    const payload = { owner, club };
-    console.log("OWNER SIGNUP:", payload);
+    const o = getOwnerFromLS();
+    if (!o?.user_id) {
+      setErr("Owner session missing. Please signup again.");
+      return;
+    }
 
-    navigate("/admin");
-  };
+    const payload = {
+      name: clubName.trim(),
+      address: address.trim(),
+      city: city.trim(),
+      lat: lat ? Number(lat) : null,
+      lon: lon ? Number(lon) : null,
+      maps_url: mapsUrl.trim() || null,
+      phone: clubPhone.trim() || null,
+      about: about.trim() || null,
+    };
 
-  return (
-    <div className="os-page">
-      <div className="os-shell">
-        {/* LEFT */}
-        <aside className="os-left">
-          <div className="os-leftCard">
-            <div className="os-brand">
-              <div className="os-logoWrap">
-                <img src={logo} alt="Racket" className="os-logo" />
-              </div>
-              <div>
-                <div className="os-name">Racket • Club Owner</div>
-                <div className="os-tag">Launch your club page fast 🚀</div>
-              </div>
+    if (!payload.name || !payload.address || !payload.city) {
+      setErr("Please fill Club Name, Address, and City.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      
+      await apiPost("/clubs", payload, ownerHeaders());
+
+      localStorage.removeItem("ownerOnboarding"); 
+      navigate("/admin");
+    } catch (e2) {
+      setErr(e2.message || "Failed to create club");
+    } finally {
+      setLoading(false);
+    }
+  }
+return (
+  <div className="os-page">
+    <div className="os-shell">
+      {/* LEFT PANEL */}
+      <div className="os-left">
+        <div className="os-leftCard">
+          <div className="os-brand">
+            <div className="os-logoWrap">
+              {/* put your logo here if you want */}
+              <span style={{ color: "white", fontWeight: 1000 }}>🏟️</span>
             </div>
 
-            {/* progress */}
-            <div className="os-progress">
-              <div className="os-progressTop">
-                <span className="os-progressLabel">Progress</span>
-                <span className="os-progressValue">{step}/2</span>
-              </div>
-              <div className="os-bar">
-                <div className="os-barFill" style={{ width: step === 1 ? "50%" : "100%" }} />
-              </div>
+            <div>
+              <div className="os-name">Racket Owner</div>
+              <div className="os-tag">Create owner + club in 2 steps</div>
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div className="os-progress">
+            <div className="os-progressTop">
+              <div className="os-progressLabel">Progress</div>
+              <div className="os-progressValue">{step === 1 ? "50%" : "100%"}</div>
             </div>
 
-            {/* step cards */}
+            <div className="os-bar">
+              <div
+                className="os-barFill"
+                style={{ width: step === 1 ? "50%" : "100%" }}
+              />
+            </div>
+
             <div className="os-steps">
               <div className={`os-step ${step === 1 ? "active" : "done"}`}>
                 <div className="os-stepDot">{step === 1 ? "1" : "✓"}</div>
                 <div>
-                  <div className="os-stepTitle">Owner info</div>
-                  <div className="os-stepSub">Create your admin account</div>
+                  <div className="os-stepTitle">Owner account</div>
+                  <div className="os-stepSub">Create your owner profile</div>
                 </div>
               </div>
 
               <div className={`os-step ${step === 2 ? "active" : ""}`}>
-                <div className="os-stepDot">2</div>
+                <div className="os-stepDot">{step === 2 ? "2" : "2"}</div>
                 <div>
-                  <div className="os-stepTitle">Club essentials</div>
-                  <div className="os-stepSub">Only basics (edit later)</div>
+                  <div className="os-stepTitle">Club info</div>
+                  <div className="os-stepSub">Add your club details</div>
                 </div>
               </div>
-            </div>
-
-            <div className="os-note">
-              ✅ You can add <b>gallery, facilities, rules, courts</b> later in <b>Edit Club</b>.
-              <div className="os-mini">For now we only need the minimum to create your club page.</div>
             </div>
           </div>
-        </aside>
 
-        {/* RIGHT */}
-        <main className="os-right">
-          <div className="os-card">
-            <Link className="os-back" to="/admin">
-              ← Back
-            </Link>
+          <div className="os-note">
+            After signup, you will be redirected to the owner dashboard.
+          </div>
+          <div className="os-mini">
+            Tip: Make sure your email is correct because it will be used to login.
+          </div>
+        </div>
+      </div>
 
-            {/* header */}
-            <div className="os-head">
-              <div className="os-kicker">{step === 1 ? "Step 1" : "Step 2"} of 2</div>
-              <div className="os-title">{step === 1 ? "Create owner account" : "Add club essentials"}</div>
-              <div className="os-sub">
-                {step === 1
-                  ? "This account will manage your club profile and courts."
-                  : "Just the essentials now — you can complete the rest later."}
-              </div>
+      {/* RIGHT PANEL */}
+      <div className="os-right">
+        <div className="os-card">
+          <Link className="os-back" to="/">
+            ← Back
+          </Link>
+
+          <div className="os-head">
+            <div className="os-kicker">Owner Signup</div>
+            <div className="os-title">{step === 1 ? "Create account" : "Create your club"}</div>
+            <div className="os-sub">
+              {step === 1
+                ? "Enter your owner information to create an account."
+                : "Now enter your club details to finish setup."}
             </div>
+          </div>
 
-            {/* FORM */}
-            {step === 1 ? (
-              <form className="os-form" onSubmit={goNext}>
-                <div className="os-2col">
-                  <div className="os-field">
-                    <label className="os-label">First name</label>
-                    <div className="os-inputWrap">
-                      <span className="os-ico">👤</span>
-                      <input
-                        className="os-input"
-                        value={owner.firstName}
-                        onChange={(e) => onOwnerChange("firstName", e.target.value)}
-                        placeholder="Nour"
-                        required
-                      />
-                    </div>
-                  </div>
+          {err && <div className="os-error" style={{ marginTop: 10 }}>{err}</div>}
 
-                  <div className="os-field">
-                    <label className="os-label">Last name</label>
-                    <div className="os-inputWrap">
-                      <span className="os-ico">👤</span>
-                      <input
-                        className="os-input"
-                        value={owner.lastName}
-                        onChange={(e) => onOwnerChange("lastName", e.target.value)}
-                        placeholder="Abusoud"
-                        required
-                      />
-                    </div>
+          {step === 1 ? (
+            <form onSubmit={submitOwner} className="os-form">
+              <div className="os-2col">
+                <div className="os-field">
+                  <div className="os-label">Full Name *</div>
+                  <div className="os-inputWrap">
+                    <div className="os-ico">👤</div>
+                    <input
+                      className="os-input"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Owner full name"
+                    />
                   </div>
                 </div>
 
                 <div className="os-field">
-                  <label className="os-label">Email</label>
+                  <div className="os-label">Email *</div>
                   <div className="os-inputWrap">
-                    <span className="os-ico">✉️</span>
+                    <div className="os-ico">📧</div>
                     <input
                       className="os-input"
-                      type="email"
-                      value={owner.email}
-                      onChange={(e) => onOwnerChange("email", e.target.value)}
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       placeholder="owner@email.com"
-                      required
                     />
                   </div>
                 </div>
+              </div>
 
+              <div className="os-2col">
                 <div className="os-field">
-                  <label className="os-label">Phone</label>
+                  <div className="os-label">Phone *</div>
                   <div className="os-inputWrap">
-                    <span className="os-ico">📞</span>
+                    <div className="os-ico">📱</div>
                     <input
                       className="os-input"
-                      value={owner.phone}
-                      onChange={(e) => onOwnerChange("phone", e.target.value)}
-                      placeholder="+962 79..."
-                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="07xxxxxxxx"
                     />
                   </div>
-                  <div className="os-help">Use the same number you want for admin contact.</div>
                 </div>
 
                 <div className="os-field">
-                  <label className="os-label">Password</label>
-                  <div className="os-passRow">
-                    <div className="os-inputWrap">
-                      <span className="os-ico">🔒</span>
-                      <input
-                        className="os-input"
-                        type={showPass ? "text" : "password"}
-                        value={owner.password}
-                        onChange={(e) => onOwnerChange("password", e.target.value)}
-                        placeholder="••••••••"
-                        required
-                      />
-                    </div>
-
-                    <button type="button" className="os-eye" onClick={() => setShowPass((v) => !v)}>
-                      {showPass ? "🙈" : "👁️"}
-                    </button>
-                  </div>
-
-                  <div className="os-strength">
-                    <div className="os-strengthBar">
-                      <div
-                        className={`os-strengthFill s${passwordStrength}`}
-                        style={{ width: `${(passwordStrength / 4) * 100}%` }}
-                      />
-                    </div>
-                    <span className={`os-strengthText s${passwordStrength}`}>{strengthLabel}</span>
-                  </div>
-                </div>
-
-                <div className="os-field">
-                  <label className="os-label">Confirm password</label>
+                  <div className="os-label">Password *</div>
                   <div className="os-inputWrap">
-                    <span className="os-ico">✅</span>
+                    <div className="os-ico">🔒</div>
                     <input
                       className="os-input"
                       type="password"
-                      value={owner.confirmPassword}
-                      onChange={(e) => onOwnerChange("confirmPassword", e.target.value)}
-                      placeholder="••••••••"
-                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Password"
                     />
                   </div>
+                </div>
+              </div>
 
-                  {owner.confirmPassword && owner.password !== owner.confirmPassword && (
-                    <div className="os-error">Passwords do not match</div>
-                  )}
+              <button className="os-btn" type="submit" disabled={loading}>
+                {loading ? "Creating..." : "Next: Club Info"}
+              </button>
+
+              <div className="os-small">
+                Already an owner? <Link to="/login">Login</Link>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={submitClub} className="os-form">
+              <div className="os-2col">
+                <div className="os-field">
+                  <div className="os-label">Club Name *</div>
+                  <div className="os-inputWrap">
+                    <div className="os-ico">🏟️</div>
+                    <input
+                      className="os-input"
+                      value={clubName}
+                      onChange={(e) => setClubName(e.target.value)}
+                      placeholder="Club name"
+                    />
+                  </div>
                 </div>
 
-                <button className="os-btn" type="submit" disabled={!canGoNext}>
-                  Next → Club essentials
+                <div className="os-field">
+                  <div className="os-label">City *</div>
+                  <div className="os-inputWrap">
+                    <div className="os-ico">🏙️</div>
+                    <input
+                      className="os-input"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Amman"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="os-field">
+                <div className="os-label">Address *</div>
+                <div className="os-inputWrap">
+                  <div className="os-ico">📍</div>
+                  <input
+                    className="os-input"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Street / area"
+                  />
+                </div>
+              </div>
+
+              <div className="os-field">
+                <div className="os-label">Maps URL</div>
+                <div className="os-inputWrap">
+                  <div className="os-ico">🗺️</div>
+                  <input
+                    className="os-input"
+                    value={mapsUrl}
+                    onChange={(e) => setMapsUrl(e.target.value)}
+                    placeholder="https://maps.google.com/..."
+                  />
+                </div>
+              </div>
+
+              <div className="os-2col">
+                <div className="os-field">
+                  <div className="os-label">Latitude</div>
+                  <div className="os-inputWrap">
+                    <div className="os-ico">🧭</div>
+                    <input
+                      className="os-input"
+                      value={lat}
+                      onChange={(e) => setLat(e.target.value)}
+                      placeholder="31.95"
+                    />
+                  </div>
+                </div>
+
+                <div className="os-field">
+                  <div className="os-label">Longitude</div>
+                  <div className="os-inputWrap">
+                    <div className="os-ico">🧭</div>
+                    <input
+                      className="os-input"
+                      value={lon}
+                      onChange={(e) => setLon(e.target.value)}
+                      placeholder="35.91"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="os-field">
+                <div className="os-label">Club Phone</div>
+                <div className="os-inputWrap">
+                  <div className="os-ico">☎️</div>
+                  <input
+                    className="os-input"
+                    value={clubPhone}
+                    onChange={(e) => setClubPhone(e.target.value)}
+                    placeholder="Optional"
+                  />
+                </div>
+              </div>
+
+              <div className="os-field">
+                <div className="os-label">About</div>
+                <div className="os-inputWrap" style={{ height: "auto", padding: 12 }}>
+                  <textarea
+                    className="os-input"
+                    style={{ minHeight: 90, resize: "vertical" }}
+                    value={about}
+                    onChange={(e) => setAbout(e.target.value)}
+                    placeholder="Short club description..."
+                  />
+                </div>
+              </div>
+
+              <div className="os-actions">
+                <button
+                  type="button"
+                  className="os-btnGhost"
+                  onClick={() => setStep(1)}
+                  disabled={loading}
+                >
+                  ← Back
                 </button>
 
-                <div className="os-small">
-                  Already have an account? <Link to="/admin/login">Sign in</Link>
-                </div>
-              </form>
-            ) : (
-              <form className="os-form" onSubmit={finish}>
-                <div className="os-field">
-                  <label className="os-label">Club name</label>
-                  <div className="os-inputWrap">
-                    <span className="os-ico">🏟️</span>
-                    <input
-                      className="os-input"
-                      value={club.name}
-                      onChange={(e) => onClubChange("name", e.target.value)}
-                      placeholder="Tropico Padel Club"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="os-2col">
-                  <div className="os-field">
-                    <label className="os-label">City</label>
-                    <div className="os-inputWrap">
-                      <span className="os-ico">📍</span>
-                      <input
-                        className="os-input"
-                        value={club.city}
-                        onChange={(e) => onClubChange("city", e.target.value)}
-                        placeholder="Amman"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="os-field">
-                    <label className="os-label">Club phone</label>
-                    <div className="os-inputWrap">
-                      <span className="os-ico">📞</span>
-                      <input
-                        className="os-input"
-                        value={club.phone}
-                        onChange={(e) => onClubChange("phone", e.target.value)}
-                        placeholder="+962 79..."
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="os-field">
-                  <label className="os-label">Address</label>
-                  <div className="os-inputWrap">
-                    <span className="os-ico">🗺️</span>
-                    <input
-                      className="os-input"
-                      value={club.address}
-                      onChange={(e) => onClubChange("address", e.target.value)}
-                      placeholder="Street, area, near landmark..."
-                      required
-                    />
-                  </div>
-                  <div className="os-help">Just a short address. Full address can be added later.</div>
-                </div>
-
-                <div className="os-2col">
-                  <div className="os-field">
-                    <label className="os-label">WhatsApp (optional)</label>
-                    <div className="os-inputWrap">
-                      <span className="os-ico">💬</span>
-                      <input
-                        className="os-input"
-                        value={club.whatsapp}
-                        onChange={(e) => onClubChange("whatsapp", e.target.value)}
-                        placeholder="+962 79..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="os-field">
-                    <label className="os-label">Maps URL (optional)</label>
-                    <div className="os-inputWrap">
-                      <span className="os-ico">🔗</span>
-                      <input
-                        className="os-input"
-                        value={club.mapsUrl}
-                        onChange={(e) => onClubChange("mapsUrl", e.target.value)}
-                        placeholder="https://maps.google.com/..."
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="os-actions">
-                  <button type="button" className="os-btnGhost" onClick={goBack}>
-                    ← Back
-                  </button>
-                  <button className="os-btn" type="submit" disabled={!canFinish}>
-                    Create club ✅
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </main>
+                <button className="os-btn" type="submit" disabled={loading}>
+                  {loading ? "Saving..." : "Finish & Go to Owner Home"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
-  );
-}
+  </div>
+);}

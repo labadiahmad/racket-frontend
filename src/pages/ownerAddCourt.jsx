@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./adminAddCourt.css";
+import "./ownerAddCourt.css";
 
 import tropicoCover from "../assets/courts/redCourt.jpeg";
 

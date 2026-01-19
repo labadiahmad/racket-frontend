@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./admin.css";
+import "./ownerHome.css";
 import projectLogo from "../assets/clubs/project-padel.png";
 
 export default function AdminDashboard() {

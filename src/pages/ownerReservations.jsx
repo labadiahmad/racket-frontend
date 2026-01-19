@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./adminReservations.css";
+import "./ownerReservations.css";
 
 export default function AdminReservations() {
   const navigate = useNavigate();

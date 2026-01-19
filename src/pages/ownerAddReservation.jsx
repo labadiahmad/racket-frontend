@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./adminAddReservation.css";
+import "./ownerAddReservation.css";
 
 import tropicoCover from "../assets/courts/redCourt.jpeg";
 import projectCover from "../assets/courts/SCR-20251203-uebn.jpeg";

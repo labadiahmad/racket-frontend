@@ -7,10 +7,15 @@ export default function Navbar() {
 
   const isCourts = pathname.startsWith("/courts") || pathname.includes("/courts/");
   const isClubs = pathname.startsWith("/clubs") && !isCourts;
-  const isAdmin = pathname.startsWith("/admin");
 
-  const user = JSON.parse(localStorage.getItem("user"));
-  const isLoggedIn = !!user;
+  let user = null;
+  try {
+    user = JSON.parse(localStorage.getItem("user"));
+  } catch {
+    user = null;
+  }
+
+  const isUserLoggedIn = !!user;
 
   return (
     <div className="nb-wrap">
@@ -22,39 +27,31 @@ export default function Navbar() {
         </div>
 
         {/* CENTER */}
-        <div className="nb-center">
-          <div className="nb-links">
-            <NavLink to="/" className={({ isActive }) => `nb-link ${isActive ? "active" : ""}`}>
-              Home
-            </NavLink>
+        <div className="nb-links">
+          <NavLink to="/" className={({ isActive }) => `nb-link ${isActive ? "active" : ""}`}>
+            Home
+          </NavLink>
 
-            <Link to="/clubs" className={`nb-link ${isClubs ? "active" : ""}`}>
-              Clubs
-            </Link>
+          <Link to="/clubs" className={`nb-link ${isClubs ? "active" : ""}`}>
+            Clubs
+          </Link>
 
-            <Link to="/courts" className={`nb-link ${isCourts ? "active" : ""}`}>
-              Courts
-            </Link>
+          <Link to="/courts" className={`nb-link ${isCourts ? "active" : ""}`}>
+            Courts
+          </Link>
 
-            <NavLink to="/contact" className={({ isActive }) => `nb-link ${isActive ? "active" : ""}`}>
-              Contact Us
-            </NavLink>
-
-            <Link to="/admin" className={`nb-admin ${isAdmin ? "active" : ""}`}>
-              Admin
-            </Link>
-          </div>
+          <NavLink to="/contact" className={({ isActive }) => `nb-link ${isActive ? "active" : ""}`}>
+            Contact Us
+          </NavLink>
         </div>
 
         {/* RIGHT */}
         <div className="nb-right">
-          {!isLoggedIn && (
+          {!isUserLoggedIn ? (
             <Link to="/login" className="nb-login">
               Sign In
             </Link>
-          )}
-
-          {isLoggedIn && (
+          ) : (
             <Link to="/profile" className="nb-profile" aria-label="Profile">
               👤
             </Link>

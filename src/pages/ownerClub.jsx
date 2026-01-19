@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import "./adminClub.css";
+import "./ownerClub.css";
 
 import tropicoCover from "../assets/courts/redCourt.jpeg";
 import tropicoCover2 from "../assets/courts/3.jpeg";
