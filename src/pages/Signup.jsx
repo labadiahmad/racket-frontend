@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./signup.css";
 import logo from "../assets/clubs/racket.png";
-import { apiFetch } from "../api";
 
 export default function Signup() {
   const navigate = useNavigate();
+
+  const API = import.meta.env.VITE_API_URL;
 
   const [form, setForm] = useState({
     fullName: "",
@@ -21,36 +22,44 @@ export default function Signup() {
   const onChange = (key, value) => setForm((p) => ({ ...p, [key]: value }));
 
   const onSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (form.password !== form.confirmPassword) {
-    alert("Passwords do not match.");
-    return;
-  }
+    if (form.password !== form.confirmPassword) {
+      alert("Passwords do not match.");
+      return;
+    }
 
-  if (!form.agree) {
-    alert("You must agree to the terms.");
-    return;
-  }
+    if (!form.agree) {
+      alert("You must agree to the terms.");
+      return;
+    }
 
-  try {
-   await apiFetch("/auth/signup", {
-  method: "POST",
-  body: JSON.stringify({
-    full_name: form.fullName,
-    email: form.email,
-    password: form.password,
-    role: "user",
-  }),
-});
+    try {
+      const res = await fetch(`${API}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          full_name: form.fullName,
+          email: form.email,
+          password: form.password,
+          role: "user",
+        }),
+      });
 
-    alert("Account created successfully");
-    navigate("/login");
-  } catch (err) {
-    alert(err.message);
-  }
-};
- 
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(data.message || data.error || "Signup failed");
+        return;
+      }
+
+      alert("Account created successfully");
+      navigate("/login");
+    } catch {
+      alert("Server error");
+    }
+  };
+
   return (
     <div className="rk-auth">
       <div className="rk-authShell">
@@ -64,7 +73,6 @@ export default function Signup() {
                 <div className="rk-brandName">Racket</div>
                 <div className="rk-brandTag">Create your account</div>
               </div>
-              
             </div>
 
             <div className="rk-leftHero">
@@ -136,15 +144,12 @@ export default function Signup() {
           </div>
         </aside>
 
-        {/* RIGHT (Form) */}
         <main className="rk-authRight">
           <div className="rk-card">
             <div className="rk-cardHead">
               <div>
                 <h2 className="rk-title">Create account</h2>
-                <p className="rk-sub">
-                  Use your email and create a password to get started.
-                </p>
+                <p className="rk-sub">Use your email and create a password to get started.</p>
               </div>
             </div>
 
@@ -183,11 +188,7 @@ export default function Signup() {
                     placeholder="••••••••"
                     required
                   />
-                  <button
-                    type="button"
-                    className="rk-eye"
-                    onClick={() => setShowPass((v) => !v)}
-                  >
+                  <button type="button" className="rk-eye" onClick={() => setShowPass((v) => !v)}>
                     {showPass ? "🙈" : "👁️"}
                   </button>
                 </div>
@@ -204,11 +205,7 @@ export default function Signup() {
                     placeholder="••••••••"
                     required
                   />
-                  <button
-                    type="button"
-                    className="rk-eye"
-                    onClick={() => setShowConfirm((v) => !v)}
-                  >
+                  <button type="button" className="rk-eye" onClick={() => setShowConfirm((v) => !v)}>
                     {showConfirm ? "🙈" : "👁️"}
                   </button>
                 </div>

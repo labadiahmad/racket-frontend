@@ -8,7 +8,11 @@ export default function Navbar() {
   const isCourts = pathname.startsWith("/courts") || pathname.includes("/courts/");
   const isClubs = pathname.startsWith("/clubs") && !isCourts;
   const isAdmin = pathname.startsWith("/admin");
-
+const handleLogout = () => {
+  localStorage.removeItem("user");
+  localStorage.removeItem("owner");
+  window.location.href = "/login";
+};
   return (
     <div className="nb-wrap">
       <div className="nb-bar">
@@ -39,6 +43,7 @@ export default function Navbar() {
           <Link to="/admin" className={`nb-admin ${isAdmin ? "active" : ""}`}>
             Admin
           </Link>
+          <button onClick={handleLogout}>Logout</button>
         </div>
 
         <Link to="/profile" className="nb-profile" aria-label="Profile">👤</Link>

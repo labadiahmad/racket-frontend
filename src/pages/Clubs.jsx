@@ -1,65 +1,59 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./clubs.css";
 import { Link } from "react-router-dom";
-
-import tropicoCover from "../assets/courts/redCourt.jpeg";
-import projectCover from "../assets/courts/SCR-20251203-uebn.jpeg";
-import wepadelCover from "../assets/courts/wepadel-court-cover.jpg";
-import cover364 from "../assets/courts/unnamed2.webp";
-
-import tropicoLogo from "../assets/clubs/tropico.png";
-import projectLogo from "../assets/clubs/project-padel.png";
-import wepadelLogo from "../assets/clubs/2.png";
-import club364Logo from "../assets/clubs/364.png";
 
 import starIcon from "../assets/clubs/star.png";
 
 export default function Clubs() {
+  const API = import.meta.env.VITE_API_URL;
+
+  function absUrl(u) {
+    if (!u) return "";
+    if (u.startsWith("http")) return u;
+    if (u.startsWith("/uploads")) return API + u; 
+    return u;
+  }
+
   const [q, setQ] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const [sortBy, setSortBy] = useState("top"); 
+  const [sortBy, setSortBy] = useState("top");
   const [minRating, setMinRating] = useState(0);
   const [location, setLocation] = useState("all");
 
-  const clubs = [
-    {
-      id: "1",
-      name: "Tropico Padel Club",
-      cover: tropicoCover,
-      logo: tropicoLogo,
-      location: "Marat St",
-      rating: 4.9,
-      reviews: 120,
-    },
-    {
-      id: "2",
-      name: "Project Padel",
-      cover: projectCover,
-      logo: projectLogo,
-      location: "KHBP",
-      rating: 3,
-      reviews: 83,
-    },
-    {
-      id: "3",
-      name: "WePadel",
-      cover: wepadelCover,
-      logo: wepadelLogo,
-      location: "Khalda",
-      rating: 2,
-      reviews: 61,
-    },
-    {
-      id: "4",
-      name: "364 Sports Club",
-      cover: cover364,
-      logo: club364Logo,
-      location: "Madaba",
-      rating: 4.6,
-      reviews: 130,
-    },
-  ];
+  const [clubs, setClubs] = useState([]);
+
+  useEffect(() => {
+    async function loadClubs() {
+      try {
+        const res = await fetch(`${API}/api/clubs`);
+        const data = await res.json().catch(() => []);
+
+        if (!res.ok) {
+          console.error("Clubs API error:", data?.message || "Failed to load clubs");
+          setClubs([]);
+          return;
+        }
+
+        const mapped = (data || []).map((c) => ({
+          id: String(c.club_id),
+          name: c.name || "",
+          cover: absUrl(c.cover_url || ""),
+          logo: absUrl(c.logo_url || ""),
+          location: c.address || c.city || "",
+          rating: Number(c.avg_rating ?? 0),
+          reviews: Number(c.reviews_count ?? 0),
+        }));
+
+        setClubs(mapped);
+      } catch (err) {
+        console.error("Clubs API error:", err);
+        setClubs([]);
+      }
+    }
+
+    loadClubs();
+  }, []);
 
   const locations = ["all"];
   for (let i = 0; i < clubs.length; i++) {
@@ -74,7 +68,8 @@ export default function Clubs() {
 
     const matchesRating = c.rating >= minRating;
 
-    const matchesLocation = location === "all" || c.location.toLowerCase() === location.toLowerCase();
+    const matchesLocation =
+      location === "all" || c.location.toLowerCase() === location.toLowerCase();
 
     return matchesText && matchesRating && matchesLocation;
   });
@@ -237,13 +232,6 @@ export default function Clubs() {
               </article>
             </Link>
           ))}
-        </div>
-
-        <div className="clb-dots">
-          <span className="clb-dot active" />
-          <span className="clb-dot" />
-          <span className="clb-dot" />
-          <span className="clb-dot" />
         </div>
       </div>
     </div>

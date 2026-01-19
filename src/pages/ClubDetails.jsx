@@ -1,264 +1,292 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "./clubDetails.css";
-
-import tropicoCover from "../assets/courts/redCourt.jpeg";
-import tropicoCover2 from "../assets/courts/3.jpeg";
-import projectCover from "../assets/courts/SCR-20251203-uebn.jpeg";
-import wepadelCover from "../assets/courts/wepadel-court-cover.jpg";
-
-import tropicoLogo from "../assets/clubs/tropico.png";
-import projectLogo from "../assets/clubs/project-padel.png";
-import wepadelLogo from "../assets/clubs/2.png";
-import club364Logo from "../assets/clubs/364.png";
-
 import starIcon from "../assets/clubs/star.png";
 
-const timeSlots = [
-  { id: "s1", from: "08:00", to: "09:00", price: 10, soldOut: false },
-  { id: "s2", from: "09:00", to: "10:00", price: 20, soldOut: true },
-  { id: "s3", from: "21:00", to: "22:00", price: 50, soldOut: false },
-  { id: "s4", from: "22:00", to: "23:00", price: 50, soldOut: true },
-  { id: "s5", from: "23:00", to: "00:00", price: 50, soldOut: false },
-];
+/* =========================
+   CONFIG
+========================= */
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5050";
+const API = `${API_BASE}/api`;
 
+/* =========================
+   HELPERS
+========================= */
+function safeArr(x) {
+  return Array.isArray(x) ? x : [];
+}
+
+function fileUrl(p) {
+  if (!p) return "";
+  if (p.startsWith("http")) return p;
+  return `${API_BASE}${p}`; // "/uploads/.." -> "http://localhost:5050/uploads/.."
+}
+
+function fmtTime(t) {
+  if (!t) return "";
+  return String(t).slice(0, 5);
+}
+
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function toISODate(dt) {
+  if (!dt) return "";
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function weatherLabel(code) {
+  if (code === 0) return { t: "Clear", ic: "☀️" };
+  if (code === 1 || code === 2) return { t: "Partly cloudy", ic: "🌤️" };
+  if (code === 3) return { t: "Cloudy", ic: "☁️" };
+  if (code === 45 || code === 48) return { t: "Fog", ic: "🌫️" };
+  if ([51, 53, 55, 56, 57].includes(code)) return { t: "Drizzle", ic: "🌦️" };
+  if ([61, 63, 65, 66, 67].includes(code)) return { t: "Rain", ic: "🌧️" };
+  if ([71, 73, 75, 77].includes(code)) return { t: "Snow", ic: "❄️" };
+  if ([80, 81, 82].includes(code)) return { t: "Rain showers", ic: "🌧️" };
+  if ([95, 96, 99].includes(code)) return { t: "Thunderstorm", ic: "⛈️" };
+  return { t: "Weather", ic: "🌡️" };
+}
+
+function getSavedUser() {
+  const raw = localStorage.getItem("user");
+  return raw ? JSON.parse(raw) : null;
+}
+
+function authHeaders(extra = {}) {
+  const u = getSavedUser();
+  return {
+    "Content-Type": "application/json",
+    ...(u?.user_id ? { "x-user-id": String(u.user_id) } : {}),
+    ...(u?.role ? { "x-role": String(u.role) } : {}),
+    ...extra,
+  };
+}
+
+async function apiGet(path) {
+  const res = await fetch(`${API}${path}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || "Request failed");
+  return data;
+}
+
+async function apiSend(path, options = {}) {
+  const res = await fetch(`${API}${path}`, {
+    ...options,
+    headers: authHeaders(options.headers || {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || "Request failed");
+  return data;
+}
+
+/* Upload helper (same backend endpoint you use) */
+async function uploadReviewImage(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+
+  const res = await fetch(`${API_BASE}/api/upload?folder=reviews`, {
+    method: "POST",
+    body: fd,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || "Upload failed");
+  return data.url; // "/uploads/reviews/xxxx.jpg"
+}
+
+/* =========================
+   COMPONENT
+========================= */
 export default function ClubDetails({ user, reservationDraft, setReservationDraft }) {
   const { id } = useParams();
+  const clubId = Number(id);
+
   const navigate = useNavigate();
   const location = useLocation();
 
-  const clubs = [
-    {
-      id: "1",
-      name: "Tropico Padel Club",
-      logo: tropicoLogo,
-      rating: 4.9,
-      reviews: 120,
-       lat: 31.9539,
-  lon: 35.9106,
-      about:
-        "Tropico Padel Club offers modern courts, easy booking, and a fun playing experience for all levels. Enjoy premium facilities and a friendly atmosphere every time you play.",
-      address: "Tropico Padel Club Al-Madina Street, District 5, Amman, Jordan",
-      mapsUrl: "https://www.google.com/maps",
-      whatsapp: "+962 792133190",
-      phone: "+962 792133190",
-      gallery: [tropicoCover, projectCover, wepadelCover, tropicoCover2, tropicoCover],
-      courts: [
-        {
-          id: "court1",
-          name: "Court 1",
-          type: "Outdoor Premium Court",
-          chips: ["Glass walls & pro turf", "LED night lighting", "Max 4 players", "Free parking & seating area"],
-          image: tropicoCover2,
-        },
-        {
-          id: "court2",
-          name: "Court 2",
-          type: "Indoor Court",
-          chips: ["Indoor", "AC", "Max 4 players", "Premium turf"],
-          image: tropicoCover,
-        },
-      ],
-      facilities: [
-        { icon: "🪑", label: "Sitting area" },
-        { icon: "🚿", label: "Changing area" },
-        { icon: "🎾", label: "Premium padel courts" },
-        { icon: "🅿️", label: "Free parking" },
-      ],
-    },
-    {
-      id: "2",
-      name: "Project Padel",
-      logo: projectLogo,
-      rating: 4.7,
-      reviews: 83,
-       lat: 31.9539,
-  lon: 35.9106,
-      about:
-        "Project Padel is an indoor-focused club with clean courts and modern facilities. Great for competitive players and training sessions.",
-      address: "Project Padel, King Hussein Business Park (KHBP), Amman, Jordan",
-      mapsUrl: "https://www.google.com/maps",
-      whatsapp: "+962 790000000",
-      phone: "+962 790000000",
-      gallery: [projectCover, wepadelCover, tropicoCover, projectCover],
-      courts: [
-        {
-          id: "court1",
-          name: "Court 1",
-          type: "Indoor Pro Court",
-          chips: ["Indoor", "AC", "LED lighting", "Max 4 players"],
-          image: projectCover,
-        },
-        {
-          id: "court2",
-          name: "Court 2",
-          type: "Indoor Training Court",
-          chips: ["Indoor", "Training friendly", "Max 4 players", "Premium turf"],
-          image: projectCover,
-        },
-      ],
-      facilities: [
-        { icon: "❄️", label: "AC indoor courts" },
-        { icon: "🅿️", label: "Parking" },
-        { icon: "🧴", label: "Changing rooms" },
-        { icon: "☕", label: "Cafe" },
-      ],
-    },
-    {
-      id: "3",
-      name: "WePadel",
-      logo: wepadelLogo,
-      rating: 4.5,
-      reviews: 61,
-       lat: 31.9539,
-  lon: 35.9106,
-      about: "WePadel offers outdoor courts with a friendly vibe. Perfect for casual games and weekend tournaments.",
-      address: "WePadel, Khalda, Amman, Jordan",
-      mapsUrl: "https://www.google.com/maps",
-      whatsapp: "+962 791111111",
-      phone: "+962 791111111",
-      gallery: [wepadelCover, tropicoCover, projectCover, wepadelCover],
-      courts: [
-        {
-          id: "court1",
-          name: "Court 1",
-          type: "Outdoor Court",
-          chips: ["Outdoor", "Good lighting", "Max 4 players", "Seating area"],
-          image: wepadelCover,
-        },
-      ],
-      facilities: [
-        { icon: "🌤️", label: "Outdoor courts" },
-        { icon: "🪑", label: "Seating" },
-        { icon: "🅿️", label: "Parking" },
-        { icon: "☕", label: "Cafe" }
-      ],
-    },
-    {
-      id: "4",
-      name: "364 Sports Club",
-      logo: club364Logo,
-      rating: 4.6,
-      reviews: 130,
-       lat: 31.9539,
-  lon: 35.9106,
-      about:
-        "364 Sports Club is a multi-sport destination with padel courts and frequent tournaments. Strong community and competitive vibes.",
-      address: "364 Sports Club, Madaba, Jordan",
-      mapsUrl: "https://www.google.com/maps",
-      whatsapp: "+962 792222222",
-      phone: "+962 792222222",
-      gallery: [tropicoCover, projectCover, wepadelCover],
-      courts: [
-        {
-          id: "court1",
-          name: "Court 1",
-          type: "Outdoor Court",
-          chips: ["Outdoor", "Tournament ready", "Max 4 players", "Parking"],
-          image: tropicoCover,
-        },
-      ],
-      facilities: [
-        { icon: "🏆", label: "Tournaments" },
-        { icon: "☕", label: "Cafe" },
-        { icon: "🅿️", label: "Parking" },
-        { icon: "🪑", label: "Seating area" },
-      ],
-    },
-  ];
+  /* ---------- DATA (from DB only) ---------- */
+  const [club, setClub] = useState(null);
+  const [clubImages, setClubImages] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+  const [courts, setCourts] = useState([]);
+  const [reviews, setReviews] = useState([]);
 
-  // find club without memo
-  let club = null;
-  for (let i = 0; i < clubs.length; i++) {
-    if (clubs[i].id === String(id)) {
-      club = clubs[i];
-      break;
-    }
-  }
+  const [courtId, setCourtId] = useState("");
+  const [courtImages, setCourtImages] = useState([]);
+  const [slots, setSlots] = useState([]);
 
-  if (!club) return <div style={{ padding: 120 }}>Club not found</div>;
+  /* ---------- UI state ---------- */
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
-  // booking step
-  const [bookStep, setBookStep] = useState("details");
-  const isThisClubDraft = reservationDraft?.clubId === String(club.id);
+  /* ---------- booking state ---------- */
+  const [bookStep, setBookStep] = useState("details"); // details -> calendar -> slots
+  const [pickedDate, setPickedDate] = useState(null);
+  const [pickedSlotId, setPickedSlotId] = useState(null);
+  const [calMonthOffset, setCalMonthOffset] = useState(0);
 
-  const [courtId, setCourtId] = useState(() => {
-    if (isThisClubDraft && reservationDraft?.courtId) return reservationDraft.courtId;
-    return club.courts[0]?.id || "";
-  });
+  /* ---------- gallery ---------- */
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryShow, setGalleryShow] = useState(false);
+  const [activeImg, setActiveImg] = useState(0);
 
-  const [pickedDate, setPickedDate] = useState(() => {
-    if (isThisClubDraft && reservationDraft?.pickedDateISO) return new Date(reservationDraft.pickedDateISO);
-    return null;
-  });
+  /* ---------- reviews tools ---------- */
+  const [rq, setRq] = useState("");
+  const [starsFilter, setStarsFilter] = useState("All");
+  const [sortBy, setSortBy] = useState("Newest");
 
-  const [pickedSlotId, setPickedSlotId] = useState(() => {
-    if (isThisClubDraft && reservationDraft?.pickedSlotId) return reservationDraft.pickedSlotId;
-    return null;
-  });
+  /* ---------- weather ---------- */
+  const [weather, setWeather] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherErr, setWeatherErr] = useState("");
 
-  let selectedCourt = club.courts[0] || null;
-  for (let i = 0; i < club.courts.length; i++) {
-    if (club.courts[i].id === courtId) {
-      selectedCourt = club.courts[i];
-      break;
-    }
-  }
+  /* ---------- add review modal ---------- */
+  const [openReview, setOpenReview] = useState(false);
+  const [revSaving, setRevSaving] = useState(false);
+  const [revErr, setRevErr] = useState("");
+  const [revDraft, setRevDraft] = useState({ stars: 5, comment: "", photos: [] });
 
-  let pickedSlot = null;
-  for (let i = 0; i < timeSlots.length; i++) {
-    if (timeSlots[i].id === pickedSlotId) {
-      pickedSlot = timeSlots[i];
-      break;
-    }
-  }
+// ---------- edit review modal ----------
+const [editOpen, setEditOpen] = useState(false);
+const [editSaving, setEditSaving] = useState(false);
+const [editErr, setEditErr] = useState("");
+const [editDraft, setEditDraft] = useState({ review_id: null, stars: 5, comment: "" });
+ 
+const closeReview = () => {
+    setOpenReview(false);
+    setRevErr("");
+    setRevDraft({ stars: 5, comment: "", photos: [] });
+  };
 
+  /* =========================
+     1) LOAD CLUB + RELATED
+  ========================= */
   useEffect(() => {
-    const sameClub = reservationDraft?.clubId === String(id);
+    let alive = true;
 
-    if (sameClub) {
-      setCourtId(reservationDraft?.courtId || club.courts[0]?.id || "");
-      setPickedDate(reservationDraft?.pickedDateISO ? new Date(reservationDraft.pickedDateISO) : null);
-      setPickedSlotId(reservationDraft?.pickedSlotId || null);
+    async function loadAll() {
+      setLoading(true);
+      setErr("");
 
-      if (location.state?.goToStep === "slots") setBookStep("slots");
-      else if (reservationDraft?.pickedSlotId) setBookStep("slots");
-      else if (reservationDraft?.pickedDateISO) setBookStep("calendar");
-      else setBookStep("details");
-    } else {
-      setCourtId(club.courts[0]?.id || "");
-      setPickedDate(null);
-      setPickedSlotId(null);
-      setBookStep("details");
+      try {
+        const [clubRes, imgs, facs, crts, revs] = await Promise.all([
+          apiGet(`/clubs/${clubId}`),
+          apiGet(`/club-images?club_id=${clubId}`).catch(() => []),
+          apiGet(`/club-facilities?club_id=${clubId}`).catch(() => []),
+          apiGet(`/courts?club_id=${clubId}`).catch(() => []),
+          apiGet(`/reviews?club_id=${clubId}`).catch(() => []),
+        ]);
+
+        if (!alive) return;
+
+        setClub(clubRes);
+        setClubImages(safeArr(imgs));
+        setFacilities(safeArr(facs));
+        setCourts(safeArr(crts));
+        setReviews(safeArr(revs));
+
+        // choose initial court
+        const firstCourt = crts?.[0]?.court_id ? String(crts[0].court_id) : "";
+        const draftCourt =
+          reservationDraft?.clubId === String(clubId) && reservationDraft?.courtId
+            ? String(reservationDraft.courtId)
+            : "";
+
+        const nextCourtId = draftCourt || firstCourt;
+        setCourtId(nextCourtId);
+
+        // restore draft date/slot (optional)
+        const draftDate =
+          reservationDraft?.clubId === String(clubId) && reservationDraft?.pickedDateISO
+            ? new Date(reservationDraft.pickedDateISO)
+            : null;
+
+        const draftSlotId =
+          reservationDraft?.clubId === String(clubId) && reservationDraft?.pickedSlotId
+            ? String(reservationDraft.pickedSlotId)
+            : null;
+
+        setPickedDate(draftDate);
+        setPickedSlotId(draftSlotId);
+
+        // step logic
+        if (location.state?.goToStep === "slots") setBookStep("slots");
+        else if (draftSlotId) setBookStep("slots");
+        else if (draftDate) setBookStep("calendar");
+        else setBookStep("details");
+      } catch (e) {
+        if (!alive) return;
+        setErr(e.message || "Failed to load club");
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
     }
-  }, [id]);
 
+    loadAll();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubId]);
+
+  /* clear route state once */
   useEffect(() => {
     if (location.state?.goToStep) {
       navigate(location.pathname, { replace: true, state: null });
     }
-  }, []);
+  }, [location.pathname, location.state, navigate]);
 
+  /* =========================
+     2) LOAD COURT IMAGES + SLOTS
+  ========================= */
   useEffect(() => {
-    if (!setReservationDraft) return;
+    let alive = true;
 
-    setReservationDraft((prev) => ({
-      ...prev,
-      clubId: String(club.id),
-      clubName: club.name,
-      clubLogo: club.logo,
-      courtId,
-      courtName: selectedCourt?.name || "",
-      courtImage: selectedCourt?.image || "",
-      pickedDateISO: pickedDate ? pickedDate.toISOString() : null,
-      pickedSlotId: pickedSlotId || null,
-      pickedSlot: pickedSlot ? { id: pickedSlot.id, from: pickedSlot.from, to: pickedSlot.to, price: pickedSlot.price } : null,
-    }));
-  }, [club.id, club.name, club.logo, courtId, selectedCourt?.name, selectedCourt?.image, pickedDate, pickedSlotId, setReservationDraft, pickedSlot]);
+    async function loadCourtExtras() {
+      if (!courtId) {
+        setCourtImages([]);
+        setSlots([]);
+        return;
+      }
 
-  const [calMonthOffset, setCalMonthOffset] = useState(0);
+      try {
+        const [ci, sl] = await Promise.all([
+          apiGet(`/court-images?court_id=${courtId}`).catch(() => []),
+          apiGet(`/slots?court_id=${courtId}`).catch(() => []),
+        ]);
 
-  const getCalInfo = () => {
+        if (!alive) return;
+        setCourtImages(safeArr(ci));
+        setSlots(safeArr(sl));
+      } catch {
+        if (!alive) return;
+        setCourtImages([]);
+        setSlots([]);
+      }
+    }
+
+    loadCourtExtras();
+    return () => {
+      alive = false;
+    };
+  }, [courtId]);
+
+  /* =========================
+     SELECTED COURT + SLOT
+  ========================= */
+  const selectedCourt = courts.find((c) => String(c.court_id) === String(courtId)) || courts[0] || null;
+  const pickedSlot = slots.find((s) => String(s.slot_id) === String(pickedSlotId)) || null;
+
+  /* =========================
+     CALENDAR HELPERS
+  ========================= */
+  function getCalInfo() {
     const base = new Date();
     const first = new Date(base.getFullYear(), base.getMonth() + calMonthOffset, 1);
     const year = first.getFullYear();
@@ -274,16 +302,58 @@ export default function ClubDetails({ user, reservationDraft, setReservationDraf
     while (cells.length % 7 !== 0) cells.push(null);
 
     return { year, monthName, cells };
-  };
+  }
 
   const calInfo = getCalInfo();
 
-  const sameDay = (a, b) =>
-    a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  function sameDay(a, b) {
+    return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
 
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [galleryShow, setGalleryShow] = useState(false);
-  const [activeImg, setActiveImg] = useState(0);
+  function isSelectableDate(dt) {
+    if (!dt) return false;
+    const today = startOfDay(new Date());
+    const max = new Date(today);
+    max.setDate(max.getDate() + 15);
+    const x = startOfDay(dt);
+    return x >= today && x <= max;
+  }
+
+  useEffect(() => {
+    if (pickedDate && !isSelectableDate(pickedDate)) {
+      setPickedDate(null);
+      setPickedSlotId(null);
+      setWeather(null);
+      setWeatherErr("");
+    }
+  }, [calMonthOffset]); // eslint-disable-line
+
+  /* =========================
+     GALLERY
+  ========================= */
+const galleryList = (() => {
+  const out = [];
+
+  const add = (p) => {
+    if (!p) return;
+    out.push(p);
+  };
+
+  add(club?.cover_url);
+
+  safeArr(clubImages).forEach((x) => {
+    if (typeof x === "string") return add(x);
+    add(x.image_url);
+    add(x.url);
+    add(x.path);
+    add(x.image);
+    add(x.cover_url);
+  });
+
+  // remove duplicates + remove empty
+  return Array.from(new Set(out)).filter(Boolean);
+})();
+
 
   const openGallery = (index = 0) => {
     setActiveImg(index);
@@ -295,8 +365,6 @@ export default function ClubDetails({ user, reservationDraft, setReservationDraf
     setTimeout(() => setGalleryOpen(false), 180);
   };
 
-
-
   useEffect(() => {
     if (!galleryOpen) return;
 
@@ -304,8 +372,8 @@ export default function ClubDetails({ user, reservationDraft, setReservationDraf
 
     const onKey = (e) => {
       if (e.key === "Escape") closeGallery();
-      if (e.key === "ArrowRight") setActiveImg((i) => (i + 1) % club.gallery.length);
-      if (e.key === "ArrowLeft") setActiveImg((i) => (i - 1 + club.gallery.length) % club.gallery.length);
+      if (e.key === "ArrowRight") setActiveImg((i) => (i + 1) % (galleryList.length || 1));
+      if (e.key === "ArrowLeft") setActiveImg((i) => (i - 1 + (galleryList.length || 1)) % (galleryList.length || 1));
     };
 
     document.addEventListener("keydown", onKey);
@@ -315,38 +383,254 @@ export default function ClubDetails({ user, reservationDraft, setReservationDraf
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
     };
-  }, [galleryOpen]);
+  }, [galleryOpen, galleryList.length]);
 
-  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  /* =========================
+     WEATHER (open-meteo)
+  ========================= */
+  useEffect(() => {
+    if (!pickedDate) {
+      setWeather(null);
+      setWeatherErr("");
+      return;
+    }
 
-const isSelectableDate = (dt) => {
-  if (!dt) return false;
+    if (!club?.lat || !club?.lon) {
+      setWeatherErr("No location for this club yet.");
+      setWeather(null);
+      return;
+    }
 
-  const today = startOfDay(new Date());
-  const max = new Date(today);
-  max.setDate(max.getDate() + 15); 
+    const dateKey = toISODate(pickedDate);
+    setWeatherLoading(true);
+    setWeatherErr("");
 
-  const x = startOfDay(dt);
-  return x >= today && x <= max;
-};
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${club.lat}&longitude=${club.lon}` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
+      `&timezone=auto&forecast_days=16`;
+
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        const days = data?.daily?.time || [];
+        const idx = days.indexOf(dateKey);
+
+        if (idx === -1) {
+          setWeather(null);
+          setWeatherErr("Weather not available for this date.");
+          return;
+        }
+
+        const code = data.daily.weather_code[idx];
+        const tMax = data.daily.temperature_2m_max[idx];
+        const tMin = data.daily.temperature_2m_min[idx];
+        const rain = data.daily.precipitation_probability_max?.[idx];
+
+        setWeather({ dateKey, code, tMax, tMin, rain });
+      })
+      .catch(() => setWeatherErr("Failed to load weather."))
+      .finally(() => setWeatherLoading(false));
+  }, [pickedDate, club?.lat, club?.lon]);
+
+  /* =========================
+     REVIEWS: FILTER + SORT
+  ========================= */
+  let filteredReviews = safeArr(reviews).slice();
+
+  const query = rq.trim().toLowerCase();
+  if (query) {
+    filteredReviews = filteredReviews.filter((x) => (x.comment || "").toLowerCase().includes(query));
+  }
+
+  if (starsFilter !== "All") {
+    filteredReviews = filteredReviews.filter((x) => Number(x.stars) === Number(starsFilter));
+  }
+
+const currentUserId = String(user?.user_id || user?.id || getSavedUser()?.user_id || "");
+const isAdmin = String(user?.role || getSavedUser()?.role || "").toLowerCase() === "admin";
+
+
+  filteredReviews.sort((a, b) => {
+    const aDate = (a.created_at || "").toString();
+    const bDate = (b.created_at || "").toString();
+    if (sortBy === "Newest") return bDate.localeCompare(aDate);
+    if (sortBy === "Oldest") return aDate.localeCompare(bDate);
+    if (sortBy === "Highest") return Number(b.stars) - Number(a.stars);
+    if (sortBy === "Lowest") return Number(a.stars) - Number(b.stars);
+    return 0;
+  });
+
+  const hasReviews = filteredReviews.length > 0;
+  const avgRating = hasReviews
+    ? Math.round((filteredReviews.reduce((sum, r) => sum + Number(r.stars || 0), 0) / filteredReviews.length) * 10) / 10
+    : 0;
+
+  /* =========================
+     ADD REVIEW + UPLOAD PHOTOS
+  ========================= */
+  const onPickPhotos = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const left = 6 - (revDraft.photos?.length || 0);
+    const chosen = files.slice(0, Math.max(left, 0));
+
+    const urls = [];
+    try {
+      for (const f of chosen) {
+        const url = await uploadReviewImage(f);
+        urls.push(url);
+      }
+      setRevDraft((p) => ({ ...p, photos: [...(p.photos || []), ...urls].slice(0, 6) }));
+    } catch (err) {
+      setRevErr(err.message || "Upload failed");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  const removePickedPhoto = (url) => {
+    setRevDraft((p) => ({ ...p, photos: (p.photos || []).filter((x) => x !== url) }));
+  };
+
+  async function reloadReviews() {
+    const revs = await apiGet(`/reviews?club_id=${clubId}`).catch(() => []);
+    setReviews(safeArr(revs));
+  }
+
+function openEditReview(r) {
+  setEditErr("");
+  setEditDraft({
+    review_id: r.review_id,
+    stars: Number(r.stars || 5),
+    comment: r.comment || "",
+  });
+  setEditOpen(true);
+}
+
+function closeEditReview() {
+  setEditOpen(false);
+  setEditErr("");
+  setEditDraft({ review_id: null, stars: 5, comment: "" });
+}
+
+async function saveEditReview() {
+  if (!editDraft.comment.trim()) {
+    setEditErr("Write a comment first.");
+    return;
+  }
+
+  try {
+    setEditSaving(true);
+    setEditErr("");
+
+    await apiSend(`/reviews/${editDraft.review_id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        stars: Number(editDraft.stars),
+        comment: editDraft.comment,
+      }),
+    });
+
+    await reloadReviews();
+    closeEditReview();
+  } catch (err) {
+    setEditErr(err.message || "Failed to update review");
+  } finally {
+    setEditSaving(false);
+  }
+}
+
+async function deleteReview(reviewId) {
+  const ok = window.confirm("Delete this review?");
+  if (!ok) return;
+
+  try {
+    await apiSend(`/reviews/${reviewId}`, { method: "DELETE" });
+    await reloadReviews();
+  } catch (err) {
+    alert(err.message || "Failed to delete review");
+  }
+}
+
+  const submitReview = async () => {
+    if (!revDraft.comment.trim()) {
+      setRevErr("Write a comment first.");
+      return;
+    }
+
+    const userId = user?.id || user?.user_id || getSavedUser()?.user_id;
+    if (!userId) {
+      setRevErr("Login required");
+      return;
+    }
+
+    try {
+      setRevSaving(true);
+      setRevErr("");
+
+      // 1) create review
+      const created = await apiSend("/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          club_id: clubId,
+          stars: Number(revDraft.stars),
+          comment: revDraft.comment,
+        }),
+      });
+
+      const reviewId = created.review_id;
+
+      // 2) save images
+      const photos = safeArr(revDraft.photos);
+      for (let i = 0; i < photos.length; i++) {
+        await apiSend("/review-images", {
+          method: "POST",
+          body: JSON.stringify({
+            review_id: Number(reviewId),
+            image_url: photos[i],
+            position: i,
+          }),
+        });
+      }
+
+      await reloadReviews();
+      closeReview();
+    } catch (err) {
+      setRevErr(err.message || "Failed to add review");
+    } finally {
+      setRevSaving(false);
+    }
+  };
+
+  /* =========================
+     BOOKING CONFIRM PAYLOAD
+  ========================= */
   const goBackStep = () => {
     if (bookStep === "calendar") setBookStep("details");
     else if (bookStep === "slots") setBookStep("calendar");
   };
 
   const goConfirm = () => {
-    if (!pickedDate || !pickedSlot || !selectedCourt) return;
+    if (!pickedDate || !pickedSlot || !selectedCourt || !club) return;
 
     const payload = {
-      clubId: String(club.id),
+      clubId: String(club.club_id),
       clubName: club.name,
-      clubLogo: club.logo,
-      courtId: selectedCourt.id,
-      courtName: selectedCourt.name,
-      courtImage: selectedCourt.image || "",
+      clubLogo: club.logo_url || "",
+      courtId: String(selectedCourt.court_id),
+      courtName: selectedCourt.name || `Court ${selectedCourt.court_id}`,
+      courtImage: courtImages?.[0]?.image_url || "",
       pickedDateISO: pickedDate.toISOString(),
-      pickedSlotId: pickedSlot.id,
-      pickedSlot,
+      pickedSlotId: String(pickedSlot.slot_id),
+      pickedSlot: {
+        id: String(pickedSlot.slot_id),
+        from: fmtTime(pickedSlot.time_from),
+        to: fmtTime(pickedSlot.time_to),
+        price: pickedSlot.price,
+      },
       returnTo: location.pathname,
     };
 
@@ -354,248 +638,45 @@ const isSelectableDate = (dt) => {
     navigate("/confirm-reservation", { state: payload });
   };
 
-const baseReviews = [
-  { id: "r1", clubId: "1", userId: "u1", name: "Ahmad", stars: 5, comment: "...", photos: [], dateISO: new Date().toISOString() },
-  { id: "r2", clubId: "1", userId: "u2", name: "Lina",  stars: 4, comment: "...", photos: [], dateISO: new Date().toISOString() },
-];
-
-  const [reviews, setReviews] = useState(() => baseReviews.filter((x) => x.clubId === String(id)));
-
   useEffect(() => {
-    setReviews(baseReviews.filter((x) => x.clubId === String(id)));
-  }, [id]);
+    if (!setReservationDraft || !club) return;
 
-  const [rq, setRq] = useState("");
-  const [starsFilter, setStarsFilter] = useState("All");
-  const [sortBy, setSortBy] = useState("Newest");
-
-  const [openReview, setOpenReview] = useState(false);
-const [deleteOpen, setDeleteOpen] = useState(false);
-const [deleteTarget, setDeleteTarget] = useState(null);
-
-const openDelete = (review) => {
-  setDeleteTarget(review);
-  setDeleteOpen(true);
-};
-
-const closeDelete = () => {
-  setDeleteOpen(false);
-  setDeleteTarget(null);
-};
-
-const confirmDelete = () => {
-  if (!deleteTarget) return;
-
-  (deleteTarget.photos || []).forEach((p) => {
-    if (typeof p === "string" && p.startsWith("blob:")) URL.revokeObjectURL(p);
-  });
-
-  setReviews((prev) => prev.filter((x) => x.id !== deleteTarget.id));
-  closeDelete();
-};
-  const [revDraft, setRevDraft] = useState({
-    name: `${user?.firstName || "User"} ${user?.lastName || ""}`.trim(),
-    stars: 5,
-    comment: "",
-    photos: [],
-  });
-
-  const closeReview = () => {
-    setOpenReview(false);
-      setEditingId(null); 
-
-    setRevDraft({
-      name: `${user?.firstName || "User"} ${user?.lastName || ""}`.trim(),
-      stars: 5,
-      comment: "",
-      photos: [],
-    });
-  };
-
-  const addReview = () => {
-    if (!revDraft.comment.trim()) return;
-
-    const newOne = {
-      id: `r_${Date.now()}`,
-      clubId: String(id),
-          userId: user?.id || "guest",  
-      name: revDraft.name || "User",
-      stars: revDraft.stars,
-      comment: revDraft.comment,
-      photos: revDraft.photos,
-      dateISO: new Date().toISOString(),
-    };
-
-    setReviews((prev) => [newOne, ...(prev || [])]);
-    closeReview();
-  };
-
-  let filteredReviews = (reviews || []).slice();
-
-  const q = rq.trim().toLowerCase();
-if (q) {
-  filteredReviews = filteredReviews.filter((x) => {
-    const name = (x.name || "").toLowerCase();
-    const comment = (x.comment || "").toLowerCase();
-    return name.includes(q) || comment.includes(q);
-  });
-}
-  if (starsFilter !== "All") filteredReviews = filteredReviews.filter((x) => x.stars === Number(starsFilter));
-
-  filteredReviews.sort((a, b) => {
-    if (sortBy === "Newest") return b.dateISO.localeCompare(a.dateISO);
-    if (sortBy === "Oldest") return a.dateISO.localeCompare(b.dateISO);
-    if (sortBy === "Highest") return b.stars - a.stars;
-    if (sortBy === "Lowest") return a.stars - b.stars;
-    return 0;
-  });
-
- const hasReviews = filteredReviews.length > 0;
-
-const avgRating = hasReviews
-  ? Math.round(
-      (filteredReviews.reduce((sum, r) => sum + r.stars, 0) /
-        filteredReviews.length) * 10
-    ) / 10
-  : 0;
-  const onPickPhotos = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const urls = files.map((f) => URL.createObjectURL(f));
-
-    setRevDraft((p) => ({
-      ...p,
-      photos: [...(p.photos || []), ...urls].slice(0, 6),
-    }));
-
-    e.target.value = "";
-  };
-
-  const removePickedPhoto = (url) => {
-    URL.revokeObjectURL(url);
-    setRevDraft((p) => ({
-      ...p,
-      photos: (p.photos || []).filter((x) => x !== url),
-    }));
-  };
-const [editingId, setEditingId] = useState(null);
-
-const startEdit = (review) => {
-  if (review.userId !== (user?.id || "guest")) return; 
-
-  setEditingId(review.id);
-
-  setRevDraft({
-    name: `${user?.firstName || "User"} ${user?.lastName || ""}`.trim(), // keep logged user name
-    stars: review.stars || 5,
-    comment: review.comment || "",
-    photos: review.photos || [],
-  });
-
-  setOpenReview(true);
-};
-
-const saveEdit = () => {
-  if (!revDraft.comment.trim()) return;
-
-  setReviews((prev) =>
-    prev.map((x) =>
-      x.id === editingId
+    setReservationDraft((prev) => ({
+      ...prev,
+      clubId: String(club.club_id),
+      clubName: club.name,
+      clubLogo: club.logo_url || "",
+      courtId: courtId || "",
+      courtName: selectedCourt?.name || "",
+      courtImage: courtImages?.[0]?.image_url || "",
+      pickedDateISO: pickedDate ? pickedDate.toISOString() : null,
+      pickedSlotId: pickedSlotId || null,
+      pickedSlot: pickedSlot
         ? {
-            ...x,
-            stars: revDraft.stars,
-            comment: revDraft.comment,
-            photos: revDraft.photos,
-            dateISO: new Date().toISOString(),
+            id: String(pickedSlot.slot_id),
+            from: fmtTime(pickedSlot.time_from),
+            to: fmtTime(pickedSlot.time_to),
+            price: pickedSlot.price,
           }
-        : x
-    )
-  );
+        : null,
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [club, courtId, selectedCourt?.name, courtImages.length, pickedDate, pickedSlotId]);
 
-  setEditingId(null);
-  closeReview();
-};
-const [weather, setWeather] = useState(null);
-const [weatherLoading, setWeatherLoading] = useState(false);
-const [weatherErr, setWeatherErr] = useState("");
+  /* =========================
+     UI STATES
+  ========================= */
+  if (loading) return <div style={{ padding: 120 }}>Loading...</div>;
+  if (err) return <div style={{ padding: 120 }}>{err}</div>;
+  if (!club) return <div style={{ padding: 120 }}>Club not found</div>;
 
-const toISODate = (dt) => {
-  if (!dt) return "";
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, "0");
-  const d = String(dt.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-useEffect(() => {
-  if (pickedDate && !isSelectableDate(pickedDate)) {
-    setPickedDate(null);
-    setWeather(null);
-    setWeatherErr("");
-  }
-}, [calMonthOffset]);
-const weatherLabel = (code) => {
-  if (code === 0) return { t: "Clear", ic: "☀️" };
-  if (code === 1 || code === 2) return { t: "Partly cloudy", ic: "🌤️" };
-  if (code === 3) return { t: "Cloudy", ic: "☁️" };
-  if (code === 45 || code === 48) return { t: "Fog", ic: "🌫️" };
-  if ([51, 53, 55, 56, 57].includes(code)) return { t: "Drizzle", ic: "🌦️" };
-  if ([61, 63, 65, 66, 67].includes(code)) return { t: "Rain", ic: "🌧️" };
-  if ([71, 73, 75, 77].includes(code)) return { t: "Snow", ic: "❄️" };
-  if ([80, 81, 82].includes(code)) return { t: "Rain showers", ic: "🌧️" };
-  if ([95, 96, 99].includes(code)) return { t: "Thunderstorm", ic: "⛈️" };
-  return { t: "Weather", ic: "🌡️" };
-};
+  /* =========================
+     RENDER
+  ========================= */
+  const topRating = Number(club.avg_rating || 0);
+  const topReviewsCount = Number(club.reviews_count || 0);
 
-
-useEffect(() => {
-  if (!pickedDate) {
-    setWeather(null);
-    setWeatherErr("");
-    return;
-  }
-
-  if (!club.lat || !club.lon) {
-    setWeatherErr("No location for this club yet.");
-    setWeather(null);
-    return;
-  }
-
-  const dateKey = toISODate(pickedDate);
-
-  setWeatherLoading(true);
-  setWeatherErr("");
-
-  const url =
-    `https://api.open-meteo.com/v1/forecast` +
-    `?latitude=${club.lat}&longitude=${club.lon}` +
-    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max` +
-    `&timezone=auto&forecast_days=16`;
-
-  fetch(url)
-    .then((r) => r.json())
-    .then((data) => {
-      const days = data?.daily?.time || [];
-      const idx = days.indexOf(dateKey);
-
-      if (idx === -1) {
-        setWeather(null);
-        setWeatherErr("Weather not available for this date.");
-        return;
-      }
-
-      const code = data.daily.weather_code[idx];
-      const tMax = data.daily.temperature_2m_max[idx];
-      const tMin = data.daily.temperature_2m_min[idx];
-      const rain = data.daily.precipitation_probability_max?.[idx];
-
-      setWeather({ dateKey, code, tMax, tMin, rain });
-    })
-    .catch(() => setWeatherErr("Failed to load weather."))
-    .finally(() => setWeatherLoading(false));
-}, [pickedDate, club.lat, club.lon]);
-
-
+  const heroImg = galleryList[0] || club.cover_url || "";
 
   return (
     <div className="cd-page">
@@ -609,20 +690,22 @@ useEffect(() => {
 
           <div className="cd-breadcrumb">
             <div className="cd-clubCrumb">
-              <img className="cd-clubLogo" src={club.logo} alt={`${club.name} logo`} />
-              <button className="cd-link" type="button" onClick={() => navigate(`/clubs/${club.id}`)}>
-                {club.name}
-              </button>
+              {club.logo_url ? (
+                <img className="cd-clubLogo" src={fileUrl(club.logo_url)} alt={`${club.name} logo`} />
+              ) : (
+                <div className="cd-clubLogo" />
+              )}
+              <button className="cd-link" type="button">{club.name}</button>
             </div>
           </div>
 
           <div className="cd-rating">
             <span className="cd-stars">
-              {Array.from({ length: Math.round(club.rating) }).map((_, i) => (
+              {Array.from({ length: Math.round(topRating) }).map((_, i) => (
                 <img key={i} src={starIcon} className="cd-star" alt="star" />
               ))}
             </span>
-            <span className="cd-rev">{club.reviews}</span>
+            <span className="cd-rev">{topReviewsCount}</span>
           </div>
         </div>
 
@@ -631,55 +714,63 @@ useEffect(() => {
           <div className="cd-leftStack">
             <section className="cd-card">
               <div className="cd-cardTitle">About The Club</div>
-              <p className="cd-cardText">{club.about}</p>
+              <p className="cd-cardText">{club.about || "No description yet."}</p>
             </section>
 
             <section className="cd-card">
               <div className="cd-cardTitle">Contact Info</div>
 
-              <a
-                className="cd-contactRow cd-wa"
-                href={`https://wa.me/${(club.whatsapp || "").replace(/\D/g, "")}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                <span className="cd-contactIc">💬</span>
-                <div className="cd-contactBody">
-                  <div className="cd-contactLabel">WhatsApp</div>
-                  <div className="cd-contactVal">{club.whatsapp}</div>
-                </div>
-              </a>
+              {club.whatsapp && (
+                <a
+                  className="cd-contactRow cd-wa"
+                  href={`https://wa.me/${String(club.whatsapp).replace(/\D/g, "")}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span className="cd-contactIc">💬</span>
+                  <div className="cd-contactBody">
+                    <div className="cd-contactLabel">WhatsApp</div>
+                    <div className="cd-contactVal">{club.whatsapp}</div>
+                  </div>
+                </a>
+              )}
 
-              <a className="cd-contactRow cd-ph" href={`tel:${club.phone}`}>
-                <span className="cd-contactIc">📞</span>
-                <div className="cd-contactBody">
-                  <div className="cd-contactLabel">Phone Number</div>
-                  <div className="cd-contactVal">{club.phone}</div>
-                </div>
-              </a>
+              {club.phone_number && (
+                <a className="cd-contactRow cd-ph" href={`tel:${club.phone_number}`}>
+                  <span className="cd-contactIc">📞</span>
+                  <div className="cd-contactBody">
+                    <div className="cd-contactLabel">Phone Number</div>
+                    <div className="cd-contactVal">{club.phone_number}</div>
+                  </div>
+                </a>
+              )}
             </section>
           </div>
 
-          <div
-            className="cd-galleryOne"
-            style={{ backgroundImage: `url(${club.gallery[0]})` }}
-            onClick={() => openGallery(0)}
-            role="button"
-            tabIndex={0}
-          >
-            <div className="cd-galleryOverlay">
-              <button
-                className="cd-viewAllBtn"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openGallery(0);
-                }}
-              >
-                View All
-              </button>
-            </div>
-          </div>
+          {/* main image */}
+         <div
+  className="cd-galleryOne"
+  style={heroImg ? { backgroundImage: `url(${fileUrl(heroImg)})` } : {}}
+  role="button"
+  tabIndex={0}
+  onClick={() => openGallery(0)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") openGallery(0);
+  }}
+>
+  <div className="cd-galleryOverlay">
+    <button
+      className="cd-viewAllBtn"
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        openGallery(0);
+      }}
+    >
+      {galleryList.length > 1 ? "View All" : "View Photo"}
+    </button>
+  </div>
+</div>
         </div>
 
         {/* BOOK YOUR COURT */}
@@ -704,9 +795,9 @@ useEffect(() => {
                   setPickedSlotId(null);
                 }}
               >
-                {club.courts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
+                {courts.map((c) => (
+                  <option key={c.court_id} value={String(c.court_id)}>
+                    {c.name || `Court ${c.court_id}`}
                   </option>
                 ))}
               </select>
@@ -724,23 +815,34 @@ useEffect(() => {
             <div className="cd-bookGrid">
               <div className="cd-detailBox">
                 <div className="cd-detailTitle">Court Details</div>
-                <div className="cd-chipSolid">{selectedCourt?.type}</div>
+                <div className="cd-chipSolid">{selectedCourt?.court_type || "Court"}</div>
 
                 <div className="cd-chipGrid">
-                  {(selectedCourt?.chips || []).map((x, i) => (
-                    <div key={i} className="cd-chip">
-                      {x}
-                    </div>
-                  ))}
+                  {safeArr(selectedCourt?.features)
+                    .map(String)
+                    .filter(Boolean)
+                    .slice(0, 8)
+                    .map((x, i) => (
+                      <div key={i} className="cd-chip">{x}</div>
+                    ))}
                 </div>
 
-                <button className="cd-ghostBtn" type="button" onClick={() => navigate(`/clubs/${club.id}/courts/${courtId}`)}>
+                <button
+                  className="cd-ghostBtn"
+                  type="button"
+                  onClick={() => navigate(`/clubs/${club.club_id}/courts/${courtId}`)}
+                >
                   View Court Details
                 </button>
               </div>
 
               <div className="cd-courtVisual">
-                <img className="cd-courtImg" src={selectedCourt?.image} alt={selectedCourt?.name || "Court"} />
+                {courtImages?.[0]?.image_url ? (
+                  <img className="cd-courtImg" src={fileUrl(courtImages[0].image_url)} alt="Court" />
+                ) : (
+                  <div className="cd-courtImg" />
+                )}
+
                 <button className="cd-nextBtn" type="button" onClick={() => setBookStep("calendar")}>
                   Next
                 </button>
@@ -773,77 +875,72 @@ useEffect(() => {
                 </div>
 
                 <div className="cd-calGrid">
-  {calInfo.cells.map((dt, idx) => (
-    <button
-      key={idx}
-      type="button"
-      className={`cd-day ${dt ? "" : "isEmpty"} ${sameDay(dt, pickedDate) ? "isSelected" : ""}`}
-      disabled={!dt || !isSelectableDate(dt)}
-      onClick={() => {
-        setPickedDate(dt);
-        setWeatherErr(""); // optional
-      }}
-    >
-      {dt ? dt.getDate() : ""}
-    </button>
-  ))}
-</div>
+                  {calInfo.cells.map((dt, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      className={`cd-day ${dt ? "" : "isEmpty"} ${sameDay(dt, pickedDate) ? "isSelected" : ""}`}
+                      disabled={!dt || !isSelectableDate(dt)}
+                      onClick={() => {
+                        setPickedDate(dt);
+                        setWeatherErr("");
+                      }}
+                    >
+                      {dt ? dt.getDate() : ""}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-             <div className="cd-calActions">
-  <div className="cd-picked">
-    {pickedDate ? `Selected: ${pickedDate.toLocaleDateString()}` : "Select a date to continue"}
-  </div>
+              <div className="cd-calActions">
+                <div className="cd-picked">
+                  {pickedDate ? `Selected: ${pickedDate.toLocaleDateString()}` : "Select a date to continue"}
+                </div>
 
-  {/* WEATHER BOX */}
-  <div className="cd-weatherBox">
-    {!pickedDate && <div className="cd-weatherMuted">Pick a date to see the weather.</div>}
+                <div className="cd-weatherBox">
+                  {!pickedDate && <div className="cd-weatherMuted">Pick a date to see the weather.</div>}
 
-{pickedDate && weatherLoading && (
-  <div className="cd-weatherMuted">
-    Loading weather...
-    <span className="cd-weatherLoadingBar" />
-  </div>
-)}
-    {pickedDate && !weatherLoading && weatherErr && (
-      <div className="cd-weatherErr">{weatherErr}</div>
-    )}
+                  {pickedDate && weatherLoading && (
+                    <div className="cd-weatherMuted">
+                      Loading weather...
+                      <span className="cd-weatherLoadingBar" />
+                    </div>
+                  )}
 
-    {pickedDate && !weatherLoading && weather && (
-      <div className="cd-weatherRow">
-        <div className="cd-weatherLeft">
-          <div className="cd-weatherIcon">{weatherLabel(weather.code).ic}</div>
-          <div>
-            <div className="cd-weatherTitle">{weatherLabel(weather.code).t}</div>
-            <div className="cd-weatherSub">{weather.dateKey}</div>
-          </div>
-        </div>
+                  {pickedDate && !weatherLoading && weatherErr && <div className="cd-weatherErr">{weatherErr}</div>}
 
-        <div className="cd-weatherRight">
-          <div className="cd-weatherTemp">
-            {Math.round(weather.tMax)}° / {Math.round(weather.tMin)}°
-          </div>
+                  {pickedDate && !weatherLoading && weather && (
+                    <div className="cd-weatherRow">
+                      <div className="cd-weatherLeft">
+                        <div className="cd-weatherIcon">{weatherLabel(weather.code).ic}</div>
+                        <div>
+                          <div className="cd-weatherTitle">{weatherLabel(weather.code).t}</div>
+                          <div className="cd-weatherSub">{weather.dateKey}</div>
+                        </div>
+                      </div>
 
-          {typeof weather.rain === "number" && (
-            <div className="cd-weatherRain">💧 {weather.rain}%</div>
-          )}
-        </div>
-      </div>
-    )}
-  </div>
+                      <div className="cd-weatherRight">
+                        <div className="cd-weatherTemp">
+                          {Math.round(weather.tMax)}° / {Math.round(weather.tMin)}°
+                        </div>
+                        {typeof weather.rain === "number" && <div className="cd-weatherRain">💧 {weather.rain}%</div>}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
-  <button
-    className="cd-nextBtn cd-confirmBtn"
-    type="button"
-    disabled={!pickedDate}
-    onClick={() => {
-      setPickedSlotId(null);
-      setBookStep("slots");
-    }}
-  >
-    Next
-  </button>
-</div>
+                <button
+                  className="cd-nextBtn cd-confirmBtn"
+                  type="button"
+                  disabled={!pickedDate}
+                  onClick={() => {
+                    setPickedSlotId(null);
+                    setBookStep("slots");
+                  }}
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
 
@@ -853,37 +950,41 @@ useEffect(() => {
               <div className="cd-slotsCard">
                 <div className="cd-slotsTitle">Pick A Time Slot</div>
 
-                <div className="cd-slotsGrid">
-                  {timeSlots.map((sl) => {
-                    const active = pickedSlotId === sl.id;
-                    const disabled = sl.soldOut;
+                {slots.length === 0 ? (
+                  <div style={{ padding: 14 }}>No time slots for this court yet.</div>
+                ) : (
+                  <div className="cd-slotsGrid">
+                    {slots.map((sl) => {
+                      const active = String(pickedSlotId) === String(sl.slot_id);
+                      const disabled = sl.is_active === false;
 
-                    return (
-                      <button
-                        key={sl.id}
-                        type="button"
-                        className={`cd-slot ${active ? "isActive" : ""} ${disabled ? "isDisabled" : ""}`}
-                        onClick={() => !disabled && setPickedSlotId(sl.id)}
-                        disabled={disabled}
-                      >
-                        <span className="cd-slotTime">
-                          {sl.from} <span className="cd-slotDash">–</span> {sl.to}
-                        </span>
+                      return (
+                        <button
+                          key={sl.slot_id}
+                          type="button"
+                          className={`cd-slot ${active ? "isActive" : ""} ${disabled ? "isDisabled" : ""}`}
+                          onClick={() => !disabled && setPickedSlotId(String(sl.slot_id))}
+                          disabled={disabled}
+                        >
+                          <span className="cd-slotTime">
+                            {fmtTime(sl.time_from)} <span className="cd-slotDash">–</span> {fmtTime(sl.time_to)}
+                          </span>
 
-                        <span className="cd-slotRight">
-                          {disabled ? <span className="cd-soldOut">Sold out</span> : <span className="cd-slotPrice">{sl.price}JD</span>}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                          <span className="cd-slotRight">
+                            {disabled ? <span className="cd-soldOut">Sold out</span> : <span className="cd-slotPrice">{Number(sl.price)}JD</span>}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="cd-slotsActions">
                 <div className="cd-summaryBox">
                   <div className="cd-sumLine">
                     <span>Court</span>
-                    <strong>{selectedCourt?.name}</strong>
+                    <strong>{selectedCourt?.name || "-"}</strong>
                   </div>
 
                   <div className="cd-sumLine">
@@ -893,7 +994,9 @@ useEffect(() => {
 
                   <div className="cd-sumLine">
                     <span>Time</span>
-                    <strong>{pickedSlot ? `${pickedSlot.from} – ${pickedSlot.to}` : "Choose a slot"}</strong>
+                    <strong>
+                      {pickedSlot ? `${fmtTime(pickedSlot.time_from)} – ${fmtTime(pickedSlot.time_to)}` : "Choose a slot"}
+                    </strong>
                   </div>
 
                   <div className="cd-sumTotal">
@@ -914,25 +1017,31 @@ useEffect(() => {
         <div className="cd-midRow">
           <section className="cd-card">
             <div className="cd-cardTitle">Facilities</div>
-            <div className="cd-facGrid">
-              {(club.facilities || []).map((f, i) => (
-                <div key={i} className="cd-facItem">
-                  <span className="cd-facIc">{f.icon}</span>
-                  <span className="cd-facText">{f.label}</span>
-                </div>
-              ))}
-            </div>
+            {facilities.length === 0 ? (
+              <div style={{ padding: 14 }}>No facilities yet.</div>
+            ) : (
+              <div className="cd-facGrid">
+                {facilities.map((f) => (
+                  <div key={f.facility_id} className="cd-facItem">
+                    <span className="cd-facIc">{f.icon || "✅"}</span>
+                    <span className="cd-facText">{f.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="cd-card cd-loc">
             <div className="cd-cardTitle">Location Details</div>
             <div className="cd-locAddressCard">{club.address}</div>
             <div className="cd-mapWrap" aria-label="Google Map" />
-            <a className="cd-mapsBtn" href={club.mapsUrl} target="_blank" rel="noreferrer">
-              <span className="cd-pinEmoji">📍</span>
-              <span>Open in Google Maps</span>
-              <span className="cd-openIc2">↗</span>
-            </a>
+            {club.maps_url && (
+              <a className="cd-mapsBtn" href={club.maps_url} target="_blank" rel="noreferrer">
+                <span className="cd-pinEmoji">📍</span>
+                <span>Open in Google Maps</span>
+                <span className="cd-openIc2">↗</span>
+              </a>
+            )}
           </section>
         </div>
 
@@ -941,30 +1050,23 @@ useEffect(() => {
           <div className="cd-revHead">
             <div>
               <div className="cd-cardTitle">Reviews</div>
-
               <div className="cd-revSub">
                 <span className="cd-revAvg">{avgRating}</span>
                 <span className="cd-revStars">
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <img key={i} src={starIcon} className={`cd-revStar ${i < Math.round(avgRating) ? "on" : "off"}`} alt="star" />
+                    <img
+                      key={i}
+                      src={starIcon}
+                      className={`cd-revStar ${i < Math.round(avgRating) ? "on" : "off"}`}
+                      alt="star"
+                    />
                   ))}
                 </span>
                 <span className="cd-revCount">({filteredReviews.length} reviews)</span>
               </div>
             </div>
 
-            <button
-              className="cd-addReviewBtn"
-              type="button"
-              onClick={() => {
-                setEditingId(null);
-                setRevDraft((p) => ({
-                  ...p,
-                  name: `${user?.firstName || "User"} ${user?.lastName || ""}`.trim(),
-                }));
-                setOpenReview(true);
-              }}
-            >
+            <button className="cd-addReviewBtn" type="button" onClick={() => setOpenReview(true)}>
               + Add Review
             </button>
           </div>
@@ -1001,59 +1103,69 @@ useEffect(() => {
             </div>
           ) : (
             <div className="cd-revListWrap">
-  <div className="cd-revList2">
-    {filteredReviews.map((r) => (
-      <article key={r.id} className="cd-revCard">
-  <div className="cd-revTopRow">
-    <div className="cd-revUser">
-      <div className="cd-revAvatar">{(r.name || "U").charAt(0)}</div>
+              <div className="cd-revList2">
+                {filteredReviews.map((r) => (
+                  <article key={r.review_id} className="cd-revCard">
+                    <div className="cd-revTopRow">
+                      <div className="cd-revUser">
+                        <div className="cd-revAvatar">{String(r.user_id || "U").charAt(0)}</div>
+                        <div className="cd-revUserMeta">
+                          <div className="cd-revName">User #{r.user_id}</div>
+                          <div className="cd-revDateInline">
+                            {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
+                          </div>
+                        </div>
+                      </div>
 
-      <div className="cd-revUserMeta">
-        <div className="cd-revName">{r.name}</div>
-        <div className="cd-revDateInline">{new Date(r.dateISO).toLocaleDateString()}</div>
-      </div>
-    </div>
-
-    <div className="cd-revRight">
-      <div className="cd-revStarsSm">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <img
-            key={i}
-            src={starIcon}
-            className={`cd-revStarSm ${i < r.stars ? "on" : ""}`}
-            alt="star"
-          />
-        ))}
-      </div>
-
-      {r.userId === (user?.id || "guest") && (
-        <div className="cd-revMiniActions">
-          <button type="button" className="cd-revMiniBtn" onClick={() => startEdit(r)}>
-            Edit
-          </button>
-          <button type="button" className="cd-revMiniBtn danger" onClick={() => openDelete(r)}>
-          Delete
-          </button>
-        </div>
-      )}
-    </div>
-  </div>
-
-  <div className="cd-revText">{r.comment}</div>
-
-  {r.photos && r.photos.length > 0 && (
-    <div className="cd-revPhotosGrid">
-      {r.photos.slice(0, 6).map((p, idx) => (
-        <button key={idx} type="button" className="cd-revPhotoItem">
-          <img className="cd-revPhotoImg" src={p.url || p} alt="" />
-        </button>
-      ))}
-    </div>
-  )}
-</article>
+                 <div className="cd-revRight">
+  <div className="cd-revStarsSm">
+    {Array.from({ length: 5 }).map((_, i) => (
+      <img
+        key={i}
+        src={starIcon}
+        className={`cd-revStarSm ${i < Number(r.stars || 0) ? "on" : ""}`}
+        alt="star"
+      />
     ))}
   </div>
+
+  {(isAdmin || String(r.user_id) === String(currentUserId)) && (
+    <div className="cd-revMiniActions">
+      <button
+        type="button"
+        className="cd-revMiniBtn"
+        onClick={() => openEditReview(r)}
+      >
+        Edit
+      </button>
+
+      <button
+        type="button"
+        className="cd-revMiniBtn danger"
+        onClick={() => deleteReview(r.review_id)}
+      >
+        Delete
+      </button>
+    </div>
+  )}
 </div>
+                    </div>
+
+                    <div className="cd-revText">{r.comment}</div>
+
+                    {Array.isArray(r.images) && r.images.length > 0 && (
+                      <div className="cd-revPhotosGrid">
+                        {r.images.slice(0, 6).map((img) => (
+                          <button key={img.image_id} type="button" className="cd-revPhotoItem">
+                            <img className="cd-revPhotoImg" src={fileUrl(img.image_url)} alt="" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </div>
           )}
         </section>
 
@@ -1065,10 +1177,8 @@ useEffect(() => {
                 <div className="cd-rHeadLeft">
                   <div className="cd-rBadge">★</div>
                   <div>
-<div className="cd-rTitle">{editingId ? "Edit Review" : "Add Review"}</div>                
-    <div className="cd-rSub">{editingId ? "Update your review in seconds" : "Share your experience in 10 seconds"}
-
-    </div>
+                    <div className="cd-rTitle">Add Review</div>
+                    <div className="cd-rSub">Share your experience</div>
                   </div>
                 </div>
 
@@ -1077,19 +1187,14 @@ useEffect(() => {
                 </button>
               </div>
 
-              <div className="cd-rUser">
-                <div className="cd-rAvatar">{revDraft.name.charAt(0)}</div>
-                <div className="cd-rUserName">{revDraft.name}</div>
-              </div>
+              {revErr && <div style={{ padding: "0 18px", color: "#c0392b" }}>{revErr}</div>}
 
               <div className="cd-rField">
                 <label>Rating</label>
-
                 <div className="cd-rStarsCenter">
                   {Array.from({ length: 5 }).map((_, i) => {
                     const n = i + 1;
                     const active = revDraft.stars >= n;
-
                     return (
                       <button
                         key={n}
@@ -1102,7 +1207,6 @@ useEffect(() => {
                     );
                   })}
                 </div>
-
                 <div className="cd-rStarValue">{revDraft.stars}/5</div>
               </div>
 
@@ -1132,13 +1236,8 @@ useEffect(() => {
                   <div className="cd-rPreviewGrid">
                     {revDraft.photos.map((url) => (
                       <div key={url} className="cd-rPrevItem2">
-                        <img src={url} alt="" />
-                        <button
-                          type="button"
-                          className="cd-rPrevRemove"
-                          onClick={() => removePickedPhoto(url)}
-                          aria-label="Remove photo"
-                        >
+                        <img src={fileUrl(url)} alt="" />
+                        <button type="button" className="cd-rPrevRemove" onClick={() => removePickedPhoto(url)}>
                           ✕
                         </button>
                       </div>
@@ -1148,103 +1247,124 @@ useEffect(() => {
               </div>
 
               <div className="cd-rActions">
-                <button className="cd-rCancel" type="button" onClick={closeReview}>
+                <button className="cd-rCancel" type="button" onClick={closeReview} disabled={revSaving}>
                   Cancel
                 </button>
-                <button
-  className="cd-nextBtn cd-rSave"
-  type="button"
-  onClick={() => (editingId ? saveEdit() : addReview())}
->
-  Save
-</button>
+
+                <button className="cd-nextBtn cd-rSave" type="button" onClick={submitReview} disabled={revSaving}>
+                  {revSaving ? "Saving..." : "Save"}
+                </button>
               </div>
             </div>
           </div>
         )}
-{deleteOpen && (
-  <div className="cd-delModal" onMouseDown={closeDelete}>
-    <div className="cd-delModalInner" onMouseDown={(e) => e.stopPropagation()}>
+{/* EDIT REVIEW MODAL */}
+{editOpen && (
+  <div className="cd-rModal" onMouseDown={closeEditReview}>
+    <div className="cd-rModalInner" onMouseDown={(e) => e.stopPropagation()}>
       <div className="cd-rHead">
         <div className="cd-rHeadLeft">
-          <div className="cd-rBadge danger">!</div>
+          <div className="cd-rBadge">✏️</div>
           <div>
-            <div className="cd-rTitle">Delete Review</div>
-            <div className="cd-rSub">This action cannot be undone</div>
+            <div className="cd-rTitle">Edit Review</div>
+            <div className="cd-rSub">Update your rating and comment</div>
           </div>
         </div>
 
-        <button className="cd-rX" type="button" onClick={closeDelete} aria-label="Close">
+        <button className="cd-rX" type="button" onClick={closeEditReview} aria-label="Close">
           ✕
         </button>
       </div>
 
-      <div className="cd-delBody">
-        <p className="cd-delText">
-          Are you sure you want to delete your review?
-        </p>
+      {editErr && <div style={{ padding: "0 18px", color: "#c0392b" }}>{editErr}</div>}
 
-        {deleteTarget && (
-          <div className="cd-delPreview">
-            <div className="cd-delName">{deleteTarget.name}</div>
-            <div className="cd-delComment">{deleteTarget.comment}</div>
-          </div>
-        )}
+      <div className="cd-rField">
+        <label>Rating</label>
+
+        <div className="cd-rStarsCenter">
+          {Array.from({ length: 5 }).map((_, i) => {
+            const n = i + 1;
+            const active = editDraft.stars >= n;
+
+            return (
+              <button
+                key={n}
+                type="button"
+                className={`cd-rStarBox ${active ? "active" : ""}`}
+                onClick={() => setEditDraft((p) => ({ ...p, stars: n }))}
+              >
+                <img src={starIcon} alt="star" />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="cd-rStarValue">{editDraft.stars}/5</div>
+      </div>
+
+      <div className="cd-rField">
+        <label>Comment</label>
+        <textarea
+          value={editDraft.comment}
+          onChange={(e) => setEditDraft((p) => ({ ...p, comment: e.target.value }))}
+          placeholder="Update your review..."
+        />
       </div>
 
       <div className="cd-rActions">
-        <button className="cd-rCancel" type="button" onClick={closeDelete}>
+        <button className="cd-rCancel" type="button" onClick={closeEditReview} disabled={editSaving}>
           Cancel
         </button>
-        <button className="cd-nextBtn cd-rSave dangerBtn" type="button" onClick={confirmDelete}>
-          Delete
+
+        <button className="cd-nextBtn cd-rSave" type="button" onClick={saveEditReview} disabled={editSaving}>
+          {editSaving ? "Saving..." : "Save Changes"}
         </button>
       </div>
     </div>
   </div>
 )}
         {/* GALLERY MODAL */}
-        {galleryOpen && (
-          <div className={`cd-modal ${galleryShow ? "show" : ""}`} onMouseDown={closeGallery}>
-            <div className="cd-modalInner" onMouseDown={(e) => e.stopPropagation()}>
-              <button className="cd-modalClose" type="button" onClick={closeGallery}>
-                ✕
-              </button>
+        {galleryOpen && galleryList.length > 0 && (
+  <div className={`cd-modal ${galleryShow ? "show" : ""}`} onMouseDown={closeGallery}>
+    <div className="cd-modalInner" onMouseDown={(e) => e.stopPropagation()}>
+      <button className="cd-modalClose" type="button" onClick={closeGallery}>
+        ✕
+      </button>
 
-              <div className="cd-modalStage">
-                <button
-                  className="cd-galArrow left"
-                  type="button"
-                  onClick={() => setActiveImg((i) => (i - 1 + club.gallery.length) % club.gallery.length)}
-                >
-                  ‹
-                </button>
+      <div className="cd-modalStage">
+        <button
+          className="cd-galArrow left"
+          type="button"
+          onClick={() => setActiveImg((i) => (i - 1 + galleryList.length) % galleryList.length)}
+        >
+          ‹
+        </button>
 
-                <img className="cd-modalImg" src={club.gallery[activeImg]} alt="" />
+        <img className="cd-modalImg" src={fileUrl(galleryList[activeImg])} alt="club" />
 
-                <button
-                  className="cd-galArrow right"
-                  type="button"
-                  onClick={() => setActiveImg((i) => (i + 1) % club.gallery.length)}
-                >
-                  ›
-                </button>
-              </div>
+        <button
+          className="cd-galArrow right"
+          type="button"
+          onClick={() => setActiveImg((i) => (i + 1) % galleryList.length)}
+        >
+          ›
+        </button>
+      </div>
 
-              <div className="cd-modalThumbs">
-                {club.gallery.map((img, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`cd-thumb ${i === activeImg ? "active" : ""}`}
-                    onClick={() => setActiveImg(i)}
-                    style={{ backgroundImage: `url(${img})` }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+      <div className="cd-modalThumbs">
+        {galleryList.map((img, i) => (
+          <button
+            key={i}
+            type="button"
+            className={`cd-thumb ${i === activeImg ? "active" : ""}`}
+            onClick={() => setActiveImg(i)}
+            style={{ backgroundImage: `url(${fileUrl(img)})` }}
+          />
+        ))}
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );

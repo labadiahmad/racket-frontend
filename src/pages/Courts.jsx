@@ -2,105 +2,87 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "./courts.css";
 
-import tropicoCover from "../assets/courts/redCourt.jpeg";
-import projectCover from "../assets/courts/SCR-20251203-uebn.jpeg";
-import wepadelCover from "../assets/courts/wepadel-court-cover.jpg";
-
-function toISODate(dmy) {
-  const parts = dmy.split(",")[1]?.trim(); 
-  if (!parts) return "";
-  const [dd, mm, yyyy] = parts.split("/");
-  if (!dd || !mm || !yyyy) return "";
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 export default function Courts() {
+  const API = import.meta.env.VITE_API_URL;
+
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const COURTS = [
-    {
-      id: 1,
-      clubId: "1",
-      courtId: "court1",
-      club: "Tropico Padel Club",
-      courtName: "Court 1",
-      type: "Outdoor",
-      cover: tropicoCover,
-      location: "Khalda",
-      date: "Sun, 22/05/2025",
-    },
-    {
-      id: 2,
-      clubId: "2",
-      courtId: "court1",
-      club: "Project Padel",
-      courtName: "Court 1",
-      type: "Indoor",
-      cover: projectCover,
-      location: "KHBP",
-      date: "Sun, 22/05/2025",
-    },
-    {
-      id: 3,
-      clubId: "3",
-      courtId: "court1",
-      club: "WePadel",
-      courtName: "Court 1",
-      type: "Outdoor",
-      cover: wepadelCover,
-      location: "Khalda",
-      date: "Sun, 22/05/2025",
-    },
-  ];
 
   const [q, setQ] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const [type, setType] = useState("all"); 
-  const [location, setLocation] = useState("all"); 
-  const [selectedDate, setSelectedDate] = useState(""); 
+  const [type, setType] = useState("all");
+  const [location, setLocation] = useState("all");
 
+  const [courts, setCourts] = useState([]);
+
+  function absUrl(u) {
+    if (!u) return "";
+    if (u.startsWith("http")) return u;
+    if (u.startsWith("/uploads")) return API + u;
+    return u;
+  }
 
   useEffect(() => {
-    const urlLoc = searchParams.get("location"); 
-    const urlDate = searchParams.get("date"); 
-    const urlType = searchParams.get("type"); 
+    const urlLoc = searchParams.get("location");
+    const urlType = searchParams.get("type");
 
     if (urlLoc) setLocation(urlLoc.toLowerCase());
-    if (urlDate) setSelectedDate(urlDate);
-
-    if (urlType) setType(urlType.toLowerCase()); 
+    if (urlType) setType(urlType.toLowerCase());
   }, [searchParams]);
 
-  const locations = ["all"];
-  COURTS.forEach((c) => {
-    const v = c.location.toLowerCase();
-    if (!locations.includes(v)) locations.push(v);
-  });
+  useEffect(() => {
+    async function loadCourts() {
+      try {
+        const res = await fetch(`${API}/api/courts`);
+        const data = await res.json().catch(() => []);
 
-  // ✅ filtering (simple)
+        if (!res.ok) {
+          console.error("Courts API error:", data?.message || "Failed to load courts");
+          setCourts([]);
+          return;
+        }
+
+        setCourts(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Courts API error:", err);
+        setCourts([]);
+      }
+    }
+
+    loadCourts();
+  }, []);
+
+  const locations = ["all"];
+  for (let i = 0; i < courts.length; i++) {
+    const city = (courts[i].club_city || "").trim();
+    if (!city) continue;
+    const v = city.toLowerCase();
+    if (!locations.includes(v)) locations.push(v);
+  }
+
   const s = q.trim().toLowerCase();
-  const filtered = COURTS.filter((c) => {
+
+  const filtered = courts.filter((c) => {
+    const clubText = `${c.club_name || ""} ${c.club_city || ""} ${c.club_address || ""}`.toLowerCase();
+
     const matchesText =
       !s ||
-      c.club.toLowerCase().includes(s) ||
-      c.location.toLowerCase().includes(s) ||
-      c.type.toLowerCase().includes(s);
+      clubText.includes(s) ||
+      String(c.type || "").toLowerCase().includes(s) ||
+      String(c.name || "").toLowerCase().includes(s);
 
-    const matchesType = type === "all" || c.type.toLowerCase() === type;
-    const matchesLoc = location === "all" || c.location.toLowerCase() === location;
+    const matchesType = type === "all" || String(c.type || "").toLowerCase() === type;
 
-    const isoDate = toISODate(c.date);
-    const matchesDate = !selectedDate || isoDate === selectedDate;
+    const city = String(c.club_city || "").toLowerCase();
+    const matchesLoc = location === "all" || city === location;
 
-    return matchesText && matchesType && matchesLoc && matchesDate;
+    return matchesText && matchesType && matchesLoc;
   });
 
   const clearFilters = () => {
     setType("all");
     setLocation("all");
-    setSelectedDate("");
     setFilterOpen(false);
   };
 
@@ -181,20 +163,6 @@ export default function Courts() {
                   </div>
                 </div>
 
-                {/* Date */}
-                <div className="crt-filterGroup">
-                  <div className="crt-filterLabel">Date</div>
-
-                  <input
-                    className="crt-dateInput"
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                  />
-
-                  <div className="crt-dateHint">Tip: select a date to show courts available on that day.</div>
-                </div>
-
                 <div className="crt-filterDivider" />
 
                 <div className="crt-filterActions">
@@ -214,30 +182,29 @@ export default function Courts() {
         <div className="crt-grid">
           {filtered.map((c) => (
             <article
-              key={c.id}
+              key={`${c.club_id}-${c.court_id}`}
               className="crt-card"
               role="button"
               tabIndex={0}
-              onClick={() => navigate(`/clubs/${c.clubId}/courts/${c.courtId}`)}
-              onKeyDown={(e) => e.key === "Enter" && navigate(`/clubs/${c.clubId}/courts/${c.courtId}`)}
+              onClick={() => navigate(`/clubs/${c.club_id}/courts/${c.court_id}`)}
+              onKeyDown={(e) => e.key === "Enter" && navigate(`/clubs/${c.club_id}/courts/${c.court_id}`)}
             >
-              <div className="crt-cover" style={{ backgroundImage: `url(${c.cover})` }}>
+              <div className="crt-cover" style={{ backgroundImage: `url(${absUrl(c.cover_url || "")})` }}>
                 <div className="crt-dim" />
 
                 <div className="crt-top">
-                  <div className="crt-title">{c.club}</div>
-                  <div className="crt-sub">{c.type}</div>
+                  <div className="crt-title">{c.club_name || "Club"}</div>
                 </div>
 
                 <div className="crt-bottom">
                   <div className="crt-pill">
-                    <span className="crt-ic">📍</span>
-                    <span>{c.location}</span>
+                    <span className="crt-ic">🎾</span>
+                    <span>{c.type || "Court"}</span>
                   </div>
 
                   <div className="crt-pill">
-                    <span className="crt-ic">🗓️</span>
-                    <span>{c.date}</span>
+                    <span className="crt-ic">📍</span>
+                    <span>{c.club_city || c.club_address || ""}</span>
                   </div>
                 </div>
               </div>

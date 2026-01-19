@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch } from "../api";
 
 import laithImg from "../assets/players/laith.jpg";
 import saraImg from "../assets/players/sara.jpg";
@@ -13,6 +12,8 @@ import "./home.css";
 
 export default function Home() {
   const navigate = useNavigate();
+
+  const API = import.meta.env.VITE_API_URL;
 
   const [homeLocation, setHomeLocation] = useState("Khalda");
   const [homeDate, setHomeDate] = useState("");
@@ -29,19 +30,25 @@ export default function Home() {
   const [courts, setCourts] = useState([]);
   const [featuredClubs, setFeaturedClubs] = useState([]);
 
-  const API_BASE = "http://localhost:5050";
   const fixUrl = (url) => {
     if (!url) return "";
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    if (url.startsWith("/uploads")) return API_BASE + url; // <-- fix here
+    if (url.startsWith("/uploads")) return API + url; // "/uploads/.." => "http://localhost:5050/uploads/.."
     return url;
   };
 
   useEffect(() => {
     async function loadHomeData() {
       try {
-        const clubsData = await apiFetch("/clubs");
-        const courtsData = await apiFetch("/courts");
+        // clubs
+        const clubsRes = await fetch(`${API}/api/clubs`);
+        const clubsData = await clubsRes.json().catch(() => []);
+        if (!clubsRes.ok) throw new Error(clubsData?.message || "Failed to load clubs");
+
+        // courts
+        const courtsRes = await fetch(`${API}/api/courts`);
+        const courtsData = await courtsRes.json().catch(() => []);
+        if (!courtsRes.ok) throw new Error(courtsData?.message || "Failed to load courts");
 
         setFeaturedClubs(
           (clubsData || []).map((c) => ({
@@ -67,6 +74,8 @@ export default function Home() {
         );
       } catch (err) {
         console.error("Home API error:", err);
+        setFeaturedClubs([]);
+        setCourts([]);
       }
     }
 
@@ -234,7 +243,6 @@ export default function Home() {
                     <span className="rk-chip">
                       <span className="rk-chip-ic">📍</span> {c.location}
                     </span>
-                   
                   </div>
                 </div>
               </article>
@@ -293,7 +301,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CLUBS (Instead of Tournaments) */}
+      {/* CLUBS */}
       <section className="rk-clubs">
         <div className="rk-container">
           <div className="rk-clubs-head rk-reveal">

@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./login.css";
 import logo from "../assets/clubs/racket.png";
-import { apiFetch } from "../api";
 
-export default function Login() {
-  const navigate = useNavigate();
+export default function Login({ setUser, setOwner }) {
+    const navigate = useNavigate();
+
+  const API = import.meta.env.VITE_API_URL;
 
   const [form, setForm] = useState({
     email: "",
@@ -22,19 +23,27 @@ export default function Login() {
     e.preventDefault();
 
     try {
-      const data = await apiFetch("/auth/login", {
+      const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: form.email,
           password: form.password,
         }),
       });
 
-      localStorage.setItem("user", JSON.stringify(data.user));
+      const data = await res.json().catch(() => ({}));
 
-      navigate("/clubs");
-    } catch (err) {
-      alert(err.message || "Login failed");
+      if (!res.ok) {
+        alert(data.message || data.error || "Login failed");
+        return;
+      }
+
+      localStorage.setItem("user", JSON.stringify(data.user));
+setUser?.(data.user);  
+navigate("/clubs");
+    } catch {
+      alert("Server error");
     }
   }
 
@@ -147,18 +156,12 @@ export default function Login() {
                   <input
                     type="checkbox"
                     checked={form.remember}
-                    onChange={(e) =>
-                      onChange("remember", e.target.checked)
-                    }
+                    onChange={(e) => onChange("remember", e.target.checked)}
                   />
                   <span>Remember me</span>
                 </label>
 
-                <button
-                  className="rk-link2"
-                  type="button"
-                  onClick={() => alert("Later")}
-                >
+                <button className="rk-link2" type="button" onClick={() => alert("Later")}>
                   Forgot password?
                 </button>
               </div>

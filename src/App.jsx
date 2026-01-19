@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { Routes, Route } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import UserLayout from "./pages/UserLayout";
 import AdminLayout from "./pages/AdminLayout";
 
 import Login from "./pages/Login";
-import Signup from "./pages/Signup.jsx"; 
+import Signup from "./pages/Signup.jsx";
 import OwnerSignup from "./pages/OwnerSignup";
 
 import Home from "./pages/Home";
@@ -26,9 +26,13 @@ import AdminReservations from "./pages/AdminReservations";
 import AdminAddReservation from "./pages/AdminAddReservation";
 import AdminReservationDetails from "./pages/AdminReservationDetails";
 import AdminAddCourt from "./pages/AdminAddCourt";
+
 import NotFound from "./pages/NotFound";
 
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [owner, setOwner] = useState(null);
+
   const [reservationDraft, setReservationDraft] = useState({
     clubId: null,
     clubName: "",
@@ -41,27 +45,62 @@ export default function App() {
     pickedSlot: null,
   });
 
-  const [user, setUser] = useState({
-    userId: "1",
-    firstName: "Nour",
-    lastName: "Abusoud",
-    email: "nour@gmail.com",
-    phone: "0790000000",
-    city: "Amman",
-    photo: "",
-  });
-
   const [reservations, setReservations] = useState([]);
+
+  // Load auth from localStorage on first load
+  useEffect(() => {
+    const rawUser = localStorage.getItem("user");
+    const rawOwner = localStorage.getItem("owner");
+
+    if (rawUser) {
+      try {
+        setUser(JSON.parse(rawUser));
+      } catch {
+        localStorage.removeItem("user");
+      }
+    }
+
+    if (rawOwner) {
+      try {
+        setOwner(JSON.parse(rawOwner));
+      } catch {
+        localStorage.removeItem("owner");
+      }
+    }
+  }, []);
 
   return (
     <Routes>
-      
-     <Route path="/login" element={<Login />} />
+      {/* AUTH */}
+      <Route
+        path="/login"
+        element={
+          user || owner ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Login setUser={setUser} setOwner={setOwner} />
+          )
+        }
+      />
 
-      <Route path="/signup" element={<Signup />} />
+      <Route
+        path="/signup"
+        element={user ? <Navigate to="/" replace /> : <Signup />}
+      />
+
       <Route path="/admin/signup" element={<OwnerSignup />} />
 
-      <Route element={<UserLayout />}>
+      {/* USER PAGES */}
+      <Route
+        element={
+          <UserLayout
+            user={user}
+            setUser={setUser}
+            owner={owner}
+            setOwner={setOwner}
+          />
+        }
+      >
         <Route path="/" element={<Home />} />
         <Route path="/clubs" element={<Clubs />} />
         <Route path="/courts" element={<Courts />} />
@@ -70,12 +109,16 @@ export default function App() {
         <Route
           path="/profile"
           element={
-            <Profile
-              user={user}
-              setUser={setUser}
-              reservations={reservations}
-              setReservations={setReservations}
-            />
+            user ? (
+              <Profile
+                user={user}
+                setUser={setUser}
+                reservations={reservations}
+                setReservations={setReservations}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
 
@@ -104,29 +147,44 @@ export default function App() {
         <Route
           path="/confirm-reservation"
           element={
-            <ConfirmReservation
-              reservationDraft={reservationDraft}
-              setReservations={setReservations}
-              user={user}
-              setUser={setUser}
-            />
+            user ? (
+              <ConfirmReservation
+                reservationDraft={reservationDraft}
+                setReservations={setReservations}
+                user={user}
+                setUser={setUser}
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
           }
         />
 
         <Route path="/reservation-success" element={<ReservationSuccess />} />
       </Route>
 
-      <Route path="/admin" element={<AdminLayout />}>
+      {/* ADMIN PAGES */}
+      <Route
+        path="/admin"
+        element={
+          owner ? (
+            <AdminLayout owner={owner} setOwner={setOwner} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      >
         <Route index element={<Admin />} />
         <Route path="club" element={<AdminClub />} />
         <Route path="courts" element={<AdminCourts />} />
-          <Route path="courts/add" element={<AdminAddCourt />} />
-
+        <Route path="courts/add" element={<AdminAddCourt />} />
         <Route path="courts/:courtId" element={<AdminCourtDetails />} />
         <Route path="reservations" element={<AdminReservations />} />
         <Route path="reservations/add" element={<AdminAddReservation />} />
-        <Route path="reservations/:bookingId" element={<AdminReservationDetails />} />
-        
+        <Route
+          path="reservations/:bookingId"
+          element={<AdminReservationDetails />}
+        />
       </Route>
 
       <Route path="*" element={<NotFound />} />
