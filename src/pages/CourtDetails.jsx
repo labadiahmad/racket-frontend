@@ -6,8 +6,9 @@ import starIcon from "../assets/clubs/star.png";
 /* =========================
    CONFIG
 ========================= */
-const API_BASE = import.meta.env.VITE_API_URL;
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5050";
 const API = `${API_BASE}/api`;
+const DRAFT_KEY = "reservationDraft";
 
 /* =========================
    HELPERS
@@ -18,8 +19,8 @@ function safeArr(x) {
 
 function fileUrl(p) {
   if (!p) return "";
-  if (p.startsWith("http")) return p;
-  return `${API_BASE}${p}`; 
+  if (String(p).startsWith("http")) return p;
+  return `${API_BASE}${p}`;
 }
 
 function fmtTime(t) {
@@ -40,9 +41,9 @@ function toISODate(dt) {
 }
 
 function parseMaybeArray(val) {
-  // supports: array OR JSON string OR comma string
   if (!val) return [];
   if (Array.isArray(val)) return val;
+
   if (typeof val === "string") {
     const s = val.trim();
     if (!s) return [];
@@ -50,14 +51,53 @@ function parseMaybeArray(val) {
       const j = JSON.parse(s);
       return Array.isArray(j) ? j : [];
     } catch {
-      return s.split(",").map((x) => x.trim()).filter(Boolean);
+      return s
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean);
     }
   }
+
   return [];
 }
 
+/* ----- localStorage draft ----- */
+function getDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setDraft(nextDraft) {
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(nextDraft));
+  return nextDraft;
+}
+
+/* ----- auth + api ----- */
+function getSavedUser() {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function authHeaders(extra = {}) {
+  const u = getSavedUser();
+  return {
+    "Content-Type": "application/json",
+    ...(u?.user_id ? { "x-user-id": String(u.user_id) } : {}),
+    ...(u?.role ? { "x-role": String(u.role) } : {}),
+    ...extra,
+  };
+}
+
 async function apiGet(path) {
-  const res = await fetch(`${API}${path}`);
+  const res = await fetch(`${API}${path}`, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || data.error || "Request failed");
   return data;
@@ -66,7 +106,7 @@ async function apiGet(path) {
 /* =========================
    COMPONENT
 ========================= */
-export default function CourtDetails({ reservationDraft, setReservationDraft }) {
+export default function CourtDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const { clubId, courtId } = useParams();
@@ -84,9 +124,10 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
   const [err, setErr] = useState("");
 
   /* ---------- Booking ---------- */
-  const [bookStep, setBookStep] = useState("calendar"); // calendar -> slots
+  const [bookStep, setBookStep] = useState("calendar"); // "calendar" | "slots"
   const [pickedDate, setPickedDate] = useState(null);
   const [pickedSlotId, setPickedSlotId] = useState(null);
+  const [bookedSlotIds, setBookedSlotIds] = useState([]);
 
   /* ---------- Calendar ---------- */
   const [calMonthOffset, setCalMonthOffset] = useState(0);
@@ -144,7 +185,9 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
 
         const list = safeArr(courtsRes);
         const found =
-          list.find((c) => String(c.court_id) === String(courtId)) || list[0] || null;
+          list.find((c) => String(c.court_id) === String(courtId)) ||
+          list[0] ||
+          null;
 
         if (!alive) return;
 
@@ -172,7 +215,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
   useEffect(() => {
     let alive = true;
 
-    async function loadCourtExtras() {
+    async function loadExtras() {
       if (!court?.court_id) {
         setCourtImages([]);
         setSlots([]);
@@ -186,7 +229,6 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
         ]);
 
         if (!alive) return;
-
         setCourtImages(safeArr(imgs));
         setSlots(safeArr(sl));
       } catch {
@@ -196,38 +238,41 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
       }
     }
 
-    loadCourtExtras();
+    loadExtras();
     return () => {
       alive = false;
     };
   }, [court?.court_id]);
 
   /* =========================
-     3) RESTORE DRAFT (same idea as your pages)
+     3) RESTORE DRAFT (localStorage)
+     - only if draft matches this club+court
+     - also support return from confirm page: state.goToStep === "slots"
   ========================= */
   useEffect(() => {
-    if (!club || !court) return;
+    if (!club?.club_id || !court?.court_id) return;
 
+    const d = getDraft();
     const same =
-      String(reservationDraft?.clubId) === String(club.club_id) &&
-      String(reservationDraft?.courtId) === String(court.court_id);
+      String(d?.clubId) === String(club.club_id) &&
+      String(d?.courtId) === String(court.court_id);
 
-    if (same) {
-      setPickedDate(reservationDraft?.pickedDateISO ? new Date(reservationDraft.pickedDateISO) : null);
-      setPickedSlotId(reservationDraft?.pickedSlotId ? String(reservationDraft.pickedSlotId) : null);
-
-      if (location.state?.goToStep === "slots") setBookStep("slots");
-      else if (reservationDraft?.pickedSlotId) setBookStep("slots");
-      else setBookStep("calendar");
-    } else {
+    if (!same) {
       setBookStep("calendar");
       setPickedDate(null);
       setPickedSlotId(null);
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [club?.club_id, court?.court_id]);
 
-  /* clear route state once */
+    setPickedDate(d?.pickedDateISO ? new Date(d.pickedDateISO) : null);
+    setPickedSlotId(d?.pickedSlotId ? String(d.pickedSlotId) : null);
+
+    if (location.state?.goToStep === "slots") setBookStep("slots");
+    else if (d?.pickedSlotId) setBookStep("slots");
+    else setBookStep("calendar");
+  }, [club?.club_id, court?.court_id, location.state]);
+
+  /* Clear route state once (to avoid infinite re-trigger) */
   useEffect(() => {
     if (location.state?.goToStep) {
       navigate(location.pathname, { replace: true, state: null });
@@ -236,7 +281,42 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
   }, []);
 
   /* =========================
-     4) CALENDAR DATA
+     4) LOAD BOOKED SLOTS when date changes
+  ========================= */
+  useEffect(() => {
+    async function loadBooked() {
+      if (!pickedDate || !court?.court_id) {
+        setBookedSlotIds([]);
+        return;
+      }
+
+      try {
+        const d = String(pickedDate.toISOString()).slice(0, 10);
+        const res = await apiGet(
+          `/reservations/booked-slots?court_id=${court.court_id}&date_iso=${d}`
+        );
+
+        const arr =
+          Array.isArray(res) ? res :
+          Array.isArray(res.booked) ? res.booked :
+          Array.isArray(res.bookedSlots) ? res.bookedSlots :
+          [];
+
+        const ids = arr
+          .map((x) => Number(x?.slot_id ?? x))
+          .filter((n) => Number.isFinite(n));
+
+        setBookedSlotIds(ids);
+      } catch {
+        setBookedSlotIds([]);
+      }
+    }
+
+    loadBooked();
+  }, [pickedDate, court?.court_id]);
+
+  /* =========================
+     5) CALENDAR DATA
   ========================= */
   const today = startOfDay(new Date());
   const maxDate = new Date(today);
@@ -272,6 +352,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
     return x >= today && x <= maxDate;
   }
 
+  /* if month changes and current pickedDate is no longer valid */
   useEffect(() => {
     if (pickedDate && !isSelectableDate(pickedDate)) {
       setPickedDate(null);
@@ -283,7 +364,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
   }, [calMonthOffset]);
 
   /* =========================
-     5) GALLERY LIST
+     6) GALLERY
   ========================= */
   const galleryList = safeArr(courtImages)
     .map((x) => x.image_url || x.url || x.path || "")
@@ -308,8 +389,12 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
 
     const onKey = (e) => {
       if (e.key === "Escape") closeGallery();
-      if (e.key === "ArrowRight") setActiveImg((i) => (i + 1) % (galleryList.length || 1));
-      if (e.key === "ArrowLeft") setActiveImg((i) => (i - 1 + (galleryList.length || 1)) % (galleryList.length || 1));
+      if (e.key === "ArrowRight") {
+        setActiveImg((i) => (i + 1) % (galleryList.length || 1));
+      }
+      if (e.key === "ArrowLeft") {
+        setActiveImg((i) => (i - 1 + (galleryList.length || 1)) % (galleryList.length || 1));
+      }
     };
 
     document.addEventListener("keydown", onKey);
@@ -322,7 +407,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
   }, [galleryOpen, galleryList.length]);
 
   /* =========================
-     6) WEATHER (open-meteo)
+     7) WEATHER (open-meteo)
   ========================= */
   useEffect(() => {
     if (!pickedDate) {
@@ -338,7 +423,6 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
     }
 
     const dateKey = toISODate(pickedDate);
-
     setWeatherLoading(true);
     setWeatherErr("");
 
@@ -372,7 +456,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
   }, [pickedDate, club?.lat, club?.lon]);
 
   /* =========================
-     7) ACTIONS
+     8) ACTIONS
   ========================= */
   function goBack() {
     navigate(-1);
@@ -412,12 +496,12 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
       returnTo: location.pathname,
     };
 
-    if (setReservationDraft) setReservationDraft((prev) => ({ ...prev, ...payload }));
+    setDraft(payload);
     navigate("/confirm-reservation", { state: payload });
   }
 
   /* =========================
-     8) UI GUARDS
+     9) UI GUARDS
   ========================= */
   if (loading) return <div style={{ padding: 120 }}>Loading...</div>;
   if (err) return <div style={{ padding: 120 }}>{err}</div>;
@@ -425,7 +509,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
   if (!court) return <div style={{ padding: 120 }}>Court not found</div>;
 
   /* =========================
-     9) UI READY DATA
+     10) UI READY DATA
   ========================= */
   const clubRating = Number(club.avg_rating || club.rating || 0);
   const clubReviewsCount = Number(club.reviews_count || club.reviews || 0);
@@ -439,6 +523,17 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
   const courtFeatures = parseMaybeArray(court.features);
   const courtRules = parseMaybeArray(court.rules);
 
+ const selectedSlot = pickedSlotId
+  ? slots.find((s) => String(s.slot_id) === String(pickedSlotId))
+  : null;
+
+const selectedTimeText = selectedSlot
+  ? `${fmtTime(selectedSlot.time_from)} – ${fmtTime(selectedSlot.time_to)}`
+  : "-";
+
+const selectedPriceText = selectedSlot
+  ? `${Number(selectedSlot.price)}JD`
+  : "-";
   return (
     <div className="ct-page">
       <div className="ct-shell">
@@ -452,7 +547,11 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
           <div className="ct-breadcrumb">
             <button className="ct-link ct-clubCrumb" type="button" onClick={goToClub}>
               {club.logo_url ? (
-                <img className="ct-clubLogo" src={fileUrl(club.logo_url)} alt={`${club.name} logo`} />
+                <img
+                  className="ct-clubLogo"
+                  src={fileUrl(club.logo_url)}
+                  alt={`${club.name} logo`}
+                />
               ) : (
                 <div className="ct-clubLogo" />
               )}
@@ -485,12 +584,6 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                     {courtType} • <span className="ct-subLink">{club.name}</span>
                   </div>
                 </div>
-                {/* 
-                <div className="ct-priceBox">
-                  <div className="ct-priceTop">💰 From</div>
-                  <div className="ct-priceVal">{Number(court.price_from || court.priceFrom || 0)} JD</div>
-                </div>
-                */}
               </div>
 
               <p className="ct-text">{courtAbout || "No description yet."}</p>
@@ -570,7 +663,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
           <div className="ct-otherList">
             {courts.map((c) => {
               const active = String(c.court_id) === String(court.court_id);
-              const typeText = (c.court_type || c.type || "").toLowerCase();
+              const typeText = String(c.court_type || c.type || "").toLowerCase();
               const isIndoor = typeText.includes("indoor");
 
               return (
@@ -582,13 +675,12 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                   tabIndex={0}
                 >
                   <div className="ct-otherLeft">
-<div
-  className="ct-otherThumb"
-  style={{
-    backgroundImage: `url(${fileUrl(c.cover_url)})`,
-  }}
-  aria-hidden="true"
-/>
+                    <div
+                      className="ct-otherThumb"
+                      style={{ backgroundImage: `url(${fileUrl(c.cover_url)})` }}
+                      aria-hidden="true"
+                    />
+
                     <div className="ct-otherInfo">
                       <div className="ct-otherTopLine">
                         <div className="ct-otherName">{c.name || `Court ${c.court_id}`}</div>
@@ -597,13 +689,15 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                         </span>
                       </div>
 
-                      <div className="ct-otherSub">
-                        {c.court_type || c.type || "Court"} 
-                      </div>
+                      <div className="ct-otherSub">{c.court_type || c.type || "Court"}</div>
                     </div>
                   </div>
 
-                  {active ? <span className="ct-currentPill">Current</span> : <span className="ct-goBtn">↗</span>}
+                  {active ? (
+                    <span className="ct-currentPill">Current</span>
+                  ) : (
+                    <span className="ct-goBtn">↗</span>
+                  )}
                 </div>
               );
             })}
@@ -645,7 +739,9 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
             <div>
               <div className="ct-cardTitle">Reserve this court</div>
               <div className="ct-muted">
-                {bookStep === "calendar" ? "Step 1 of 2 • Pick a date" : "Step 2 of 2 • Pick a time slot"}
+                {bookStep === "calendar"
+                  ? "Step 1 of 2 • Pick a date"
+                  : "Step 2 of 2 • Pick a time slot"}
               </div>
             </div>
 
@@ -696,6 +792,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                       disabled={!dt || !isSelectableDate(dt)}
                       onClick={() => {
                         setPickedDate(dt);
+                        setPickedSlotId(null);
                         setWeatherErr("");
                       }}
                     >
@@ -743,7 +840,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                 </div>
 
                 <button
-                  className="cd-nextBtn cd-confirmBtn"
+                  className="ct-primaryBtn"
                   type="button"
                   disabled={!pickedDate}
                   onClick={() => {
@@ -769,7 +866,8 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                   <div className="ct-slotsGrid">
                     {slots.map((sl) => {
                       const active = String(pickedSlotId) === String(sl.slot_id);
-                      const disabled = sl.is_active === false;
+                      const disabled =
+                        sl.is_active === false || bookedSlotIds.includes(Number(sl.slot_id));
 
                       return (
                         <button
@@ -815,9 +913,14 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
                   </div>
 
                   <div className="ct-sumLine">
-                    <span>Time</span>
-                    <strong>{pickedSlotId ? "Selected" : "Choose a slot"}</strong>
-                  </div>
+  <span>Time</span>
+  <strong>{pickedSlotId ? selectedTimeText : "Choose a slot"}</strong>
+</div>
+
+<div className="ct-sumLine">
+  <span>Total</span>
+  <strong>{pickedSlotId ? selectedPriceText : "-"}</strong>
+</div>
                 </div>
 
                 <button className="ct-primaryBtn" type="button" disabled={!pickedSlotId} onClick={goConfirm}>
@@ -884,7 +987,7 @@ export default function CourtDetails({ reservationDraft, setReservationDraft }) 
               <div className="ct-modalThumbs">
                 {galleryList.map((img, i) => (
                   <button
-                    key={img}
+                    key={`${img}-${i}`}
                     type="button"
                     className={`ct-thumb ${i === activeImg ? "active" : ""}`}
                     onClick={() => setActiveImg(i)}

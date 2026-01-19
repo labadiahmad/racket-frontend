@@ -41,7 +41,7 @@ export default function Login({ setUser, setOwner }) {
 
       localStorage.setItem("user", JSON.stringify(data.user));
 setUser?.(data.user);  
-navigate("/clubs");
+navigate("/");
     } catch {
       alert("Server error");
     }

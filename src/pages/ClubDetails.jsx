@@ -6,7 +6,7 @@ import starIcon from "../assets/clubs/star.png";
 /* =========================
    CONFIG
 ========================= */
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5050";
+const API_BASE = import.meta.env.VITE_API_URL ;
 const API = `${API_BASE}/api`;
 
 /* =========================
@@ -16,10 +16,27 @@ function safeArr(x) {
   return Array.isArray(x) ? x : [];
 }
 
+const DRAFT_KEY = "reservationDraft";
+
+function getDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setDraft(patch) {
+  const prev = getDraft() || {};
+  const next = { ...prev, ...patch };
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
+  return next;
+}
 function fileUrl(p) {
   if (!p) return "";
   if (p.startsWith("http")) return p;
-  return `${API_BASE}${p}`; // "/uploads/.." -> "http://localhost:5050/uploads/.."
+  return `${API_BASE}${p}`; 
 }
 
 function fmtTime(t) {
@@ -68,7 +85,7 @@ function authHeaders(extra = {}) {
 }
 
 async function apiGet(path) {
-  const res = await fetch(`${API}${path}`);
+  const res = await fetch(`${API}${path}`, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || data.error || "Request failed");
   return data;
@@ -84,7 +101,6 @@ async function apiSend(path, options = {}) {
   return data;
 }
 
-/* Upload helper (same backend endpoint you use) */
 async function uploadReviewImage(file) {
   const fd = new FormData();
   fd.append("file", file);
@@ -96,14 +112,14 @@ async function uploadReviewImage(file) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || "Upload failed");
-  return data.url; // "/uploads/reviews/xxxx.jpg"
+  return data.url; 
 }
 
 /* =========================
    COMPONENT
 ========================= */
-export default function ClubDetails({ user, reservationDraft, setReservationDraft }) {
-  const { id } = useParams();
+export default function ClubDetails({ user }) { 
+   const { id } = useParams();
   const clubId = Number(id);
 
   const navigate = useNavigate();
@@ -125,11 +141,11 @@ export default function ClubDetails({ user, reservationDraft, setReservationDraf
   const [err, setErr] = useState("");
 
   /* ---------- booking state ---------- */
-  const [bookStep, setBookStep] = useState("details"); // details -> calendar -> slots
+  const [bookStep, setBookStep] = useState("details"); 
   const [pickedDate, setPickedDate] = useState(null);
   const [pickedSlotId, setPickedSlotId] = useState(null);
   const [calMonthOffset, setCalMonthOffset] = useState(0);
-
+  const [bookedSlotIds, setBookedSlotIds] = useState([]);
   /* ---------- gallery ---------- */
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryShow, setGalleryShow] = useState(false);
@@ -190,35 +206,38 @@ const closeReview = () => {
         setCourts(safeArr(crts));
         setReviews(safeArr(revs));
 
-        // choose initial court
-        const firstCourt = crts?.[0]?.court_id ? String(crts[0].court_id) : "";
-        const draftCourt =
-          reservationDraft?.clubId === String(clubId) && reservationDraft?.courtId
-            ? String(reservationDraft.courtId)
-            : "";
+        const reservationDraft = getDraft();
 
-        const nextCourtId = draftCourt || firstCourt;
-        setCourtId(nextCourtId);
+const firstCourt = crts?.[0]?.court_id ? String(crts[0].court_id) : "";
 
-        // restore draft date/slot (optional)
-        const draftDate =
-          reservationDraft?.clubId === String(clubId) && reservationDraft?.pickedDateISO
-            ? new Date(reservationDraft.pickedDateISO)
-            : null;
+const draftCourt =
+  reservationDraft?.clubId === String(clubId) && reservationDraft?.courtId
+    ? String(reservationDraft.courtId)
+    : "";
 
-        const draftSlotId =
-          reservationDraft?.clubId === String(clubId) && reservationDraft?.pickedSlotId
-            ? String(reservationDraft.pickedSlotId)
-            : null;
+const nextCourtId = draftCourt || firstCourt;
+setCourtId(nextCourtId);
 
-        setPickedDate(draftDate);
-        setPickedSlotId(draftSlotId);
+const draftDate =
+  reservationDraft?.clubId === String(clubId) && reservationDraft?.pickedDateISO
+    ? new Date(reservationDraft.pickedDateISO)
+    : null;
 
-        // step logic
-        if (location.state?.goToStep === "slots") setBookStep("slots");
-        else if (draftSlotId) setBookStep("slots");
-        else if (draftDate) setBookStep("calendar");
-        else setBookStep("details");
+const draftSlotId =
+  reservationDraft?.clubId === String(clubId) && reservationDraft?.pickedSlotId
+    ? String(reservationDraft.pickedSlotId)
+    : null;
+
+setPickedDate(draftDate);
+setPickedSlotId(draftSlotId);
+
+if (location.state?.goToStep === "slots") setBookStep("slots");
+else if (draftSlotId) setBookStep("slots");
+else if (draftDate) setBookStep("calendar");
+else setBookStep("details");
+
+       
+          
       } catch (e) {
         if (!alive) return;
         setErr(e.message || "Failed to load club");
@@ -232,10 +251,8 @@ const closeReview = () => {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubId]);
 
-  /* clear route state once */
   useEffect(() => {
     if (location.state?.goToStep) {
       navigate(location.pathname, { replace: true, state: null });
@@ -320,13 +337,48 @@ const closeReview = () => {
   }
 
   useEffect(() => {
+  if (!club) return;
+
+  const patch = {
+    clubId: String(club.club_id),
+    clubName: club.name,
+    clubLogo: club.logo_url || "",
+    courtId: courtId ? String(courtId) : "",
+    courtName: selectedCourt?.name || "",
+    courtImage: courtImages?.[0]?.image_url || "",
+    pickedDateISO: pickedDate ? pickedDate.toISOString() : null,
+    pickedSlotId: pickedSlotId ? String(pickedSlotId) : null,
+    pickedSlot: pickedSlot
+      ? {
+          id: String(pickedSlot.slot_id),
+          from: fmtTime(pickedSlot.time_from),
+          to: fmtTime(pickedSlot.time_to),
+          price: pickedSlot.price,
+        }
+      : null,
+    returnTo: location.pathname,
+  };
+
+  setDraft(patch);
+},[
+  club,
+  courtId,
+  selectedCourt?.name,
+  courtImages?.[0]?.image_url,
+  pickedDate,
+  pickedSlotId,
+  pickedSlot,
+  location.pathname
+]);
+
+  useEffect(() => {
     if (pickedDate && !isSelectableDate(pickedDate)) {
       setPickedDate(null);
       setPickedSlotId(null);
       setWeather(null);
       setWeatherErr("");
     }
-  }, [calMonthOffset]); // eslint-disable-line
+  }, [calMonthOffset]); 
 
   /* =========================
      GALLERY
@@ -350,7 +402,6 @@ const galleryList = (() => {
     add(x.cover_url);
   });
 
-  // remove duplicates + remove empty
   return Array.from(new Set(out)).filter(Boolean);
 })();
 
@@ -571,7 +622,6 @@ async function deleteReview(reviewId) {
       setRevSaving(true);
       setRevErr("");
 
-      // 1) create review
       const created = await apiSend("/reviews", {
         method: "POST",
         body: JSON.stringify({
@@ -583,7 +633,6 @@ async function deleteReview(reviewId) {
 
       const reviewId = created.review_id;
 
-      // 2) save images
       const photos = safeArr(revDraft.photos);
       for (let i = 0; i < photos.length; i++) {
         await apiSend("/review-images", {
@@ -634,35 +683,41 @@ async function deleteReview(reviewId) {
       returnTo: location.pathname,
     };
 
-    if (setReservationDraft) setReservationDraft((prev) => ({ ...prev, ...payload }));
-    navigate("/confirm-reservation", { state: payload });
+   setDraft(payload);
+navigate("/confirm-reservation", { state: payload });
   };
 
-  useEffect(() => {
-    if (!setReservationDraft || !club) return;
+ async function loadBookedSlots(cId, dateISO) {
+  if (!cId || !dateISO) {
+    setBookedSlotIds([]);
+    return;
+  }
 
-    setReservationDraft((prev) => ({
-      ...prev,
-      clubId: String(club.club_id),
-      clubName: club.name,
-      clubLogo: club.logo_url || "",
-      courtId: courtId || "",
-      courtName: selectedCourt?.name || "",
-      courtImage: courtImages?.[0]?.image_url || "",
-      pickedDateISO: pickedDate ? pickedDate.toISOString() : null,
-      pickedSlotId: pickedSlotId || null,
-      pickedSlot: pickedSlot
-        ? {
-            id: String(pickedSlot.slot_id),
-            from: fmtTime(pickedSlot.time_from),
-            to: fmtTime(pickedSlot.time_to),
-            price: pickedSlot.price,
-          }
-        : null,
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [club, courtId, selectedCourt?.name, courtImages.length, pickedDate, pickedSlotId]);
+  try {
+    const d = String(dateISO).slice(0, 10);
+    const res = await apiGet(`/reservations/booked-slots?court_id=${cId}&date_iso=${d}`);
 
+    const arr =
+      Array.isArray(res) ? res :
+      Array.isArray(res.booked) ? res.booked :
+      Array.isArray(res.bookedSlots) ? res.bookedSlots :
+      [];
+
+    const ids = arr.map((x) => Number(x.slot_id ?? x)).filter((n) => Number.isFinite(n));
+    setBookedSlotIds(ids);
+  } catch {
+    setBookedSlotIds([]);
+  }
+}
+
+useEffect(() => {
+  if (!pickedDate || !courtId) {
+    setBookedSlotIds([]);
+    return;
+  }
+  loadBookedSlots(courtId, pickedDate.toISOString());
+}, [pickedDate, courtId]);
+ 
   /* =========================
      UI STATES
   ========================= */
@@ -747,30 +802,30 @@ async function deleteReview(reviewId) {
             </section>
           </div>
 
-          {/* main image */}
-         <div
-  className="cd-galleryOne"
-  style={heroImg ? { backgroundImage: `url(${fileUrl(heroImg)})` } : {}}
-  role="button"
-  tabIndex={0}
-  onClick={() => openGallery(0)}
-  onKeyDown={(e) => {
-    if (e.key === "Enter") openGallery(0);
-  }}
->
-  <div className="cd-galleryOverlay">
-    <button
-      className="cd-viewAllBtn"
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        openGallery(0);
-      }}
-    >
-      {galleryList.length > 1 ? "View All" : "View Photo"}
-    </button>
-  </div>
-</div>
+                    {/* main image */}
+                  <div
+            className="cd-galleryOne"
+            style={heroImg ? { backgroundImage: `url(${fileUrl(heroImg)})` } : {}}
+            role="button"
+            tabIndex={0}
+            onClick={() => openGallery(0)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") openGallery(0);
+            }}
+          >
+            <div className="cd-galleryOverlay">
+              <button
+                className="cd-viewAllBtn"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openGallery(0);
+                }}
+              >
+                {galleryList.length > 1 ? "View All" : "View Photo"}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* BOOK YOUR COURT */}
@@ -793,6 +848,9 @@ async function deleteReview(reviewId) {
                   setCourtId(e.target.value);
                   setPickedDate(null);
                   setPickedSlotId(null);
+                  setBookedSlotIds([]); 
+                  setDraft({ pickedSlotId: null, pickedSlot: null, pickedDateISO: null }); 
+
                 }}
               >
                 {courts.map((c) => (
@@ -883,6 +941,7 @@ async function deleteReview(reviewId) {
                       disabled={!dt || !isSelectableDate(dt)}
                       onClick={() => {
                         setPickedDate(dt);
+                        setPickedSlotId(null);   
                         setWeatherErr("");
                       }}
                     >
@@ -956,8 +1015,8 @@ async function deleteReview(reviewId) {
                   <div className="cd-slotsGrid">
                     {slots.map((sl) => {
                       const active = String(pickedSlotId) === String(sl.slot_id);
-                      const disabled = sl.is_active === false;
-
+                      const disabled =
+                      sl.is_active === false || bookedSlotIds.includes(Number(sl.slot_id));
                       return (
                         <button
                           key={sl.slot_id}
@@ -982,6 +1041,11 @@ async function deleteReview(reviewId) {
 
               <div className="cd-slotsActions">
                 <div className="cd-summaryBox">
+
+                  <div className="ct-sumLine">
+                 <span>Club</span>
+                <strong>{club?.name || "-"}</strong>
+                </div>
                   <div className="cd-sumLine">
                     <span>Court</span>
                     <strong>{selectedCourt?.name || "-"}</strong>
@@ -1117,38 +1181,38 @@ async function deleteReview(reviewId) {
                         </div>
                       </div>
 
-                 <div className="cd-revRight">
-  <div className="cd-revStarsSm">
-    {Array.from({ length: 5 }).map((_, i) => (
-      <img
-        key={i}
-        src={starIcon}
-        className={`cd-revStarSm ${i < Number(r.stars || 0) ? "on" : ""}`}
-        alt="star"
-      />
-    ))}
-  </div>
+                     <div className="cd-revRight">
+                      <div className="cd-revStarsSm">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <img
+                            key={i}
+                            src={starIcon}
+                            className={`cd-revStarSm ${i < Number(r.stars || 0) ? "on" : ""}`}
+                            alt="star"
+                          />
+                        ))}
+                      </div>
 
-  {(isAdmin || String(r.user_id) === String(currentUserId)) && (
-    <div className="cd-revMiniActions">
-      <button
-        type="button"
-        className="cd-revMiniBtn"
-        onClick={() => openEditReview(r)}
-      >
-        Edit
-      </button>
+                      {(isAdmin || String(r.user_id) === String(currentUserId)) && (
+                        <div className="cd-revMiniActions">
+                          <button
+                            type="button"
+                            className="cd-revMiniBtn"
+                            onClick={() => openEditReview(r)}
+                          >
+                            Edit
+                          </button>
 
-      <button
-        type="button"
-        className="cd-revMiniBtn danger"
-        onClick={() => deleteReview(r.review_id)}
-      >
-        Delete
-      </button>
-    </div>
-  )}
-</div>
+                          <button
+                            type="button"
+                            className="cd-revMiniBtn danger"
+                            onClick={() => deleteReview(r.review_id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     </div>
 
                     <div className="cd-revText">{r.comment}</div>

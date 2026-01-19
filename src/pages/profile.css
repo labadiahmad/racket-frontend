@@ -598,3 +598,45 @@
     grid-template-columns:1fr;
   }
 }
+
+.pf-modalHeader{
+  border-bottom: 1px solid rgba(15,23,42,.10) !important;
+  padding: 18px 18px 14px !important;
+}
+
+.pf-modalTitle{
+  font-weight: 1000;
+  letter-spacing: .2px;
+}
+
+.pf-modalBody{
+  padding: 18px !important;
+}
+
+.pf-modalSub{
+  color: rgba(15,23,42,.72);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.pf-modalLabel{
+  font-weight: 900;
+  font-size: 12px;
+  color: rgba(15,23,42,.72);
+}
+
+.pf-modalHint{
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(15,23,42,.55);
+}
+
+.pf-modalActions{
+  display:flex;
+  justify-content: space-between;
+  align-items:center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(15,23,42,.10);
+}

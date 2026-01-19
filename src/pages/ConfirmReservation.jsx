@@ -2,14 +2,50 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import "./confirmReservation.css";
 
-export default function ConfirmReservation({ reservationDraft, setReservations, user, setUser }) {  
-    
+const API_BASE = import.meta.env.VITE_API_URL ;
+const API = `${API_BASE}/api`;
+
+const DRAFT_KEY = "reservationDraft";
+const SUCCESS_KEY = "reservationSuccess";
+
+function getDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getSavedUser() {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getAuthHeaders(user) {
+  const userId = user?.user_id || user?.id;
+  const role = user?.role || "user";
+  if (!userId) return null;
+
+  return {
+    "Content-Type": "application/json",
+    "x-user-id": String(userId),
+    "x-role": String(role),
+  };
+}
+
+export default function ConfirmReservation({ user, setUser }) {
   const navigate = useNavigate();
-  const { state } = useLocation();
+  const location = useLocation();
 
-  const data = state || reservationDraft;
+  const data = location.state || getDraft();
+  const savedUser = user || getSavedUser();
 
-  const isValidDraft =
+  const isValidDraft = !!(
     data &&
     data.clubId &&
     data.courtId &&
@@ -19,29 +55,40 @@ export default function ConfirmReservation({ reservationDraft, setReservations, 
     data.pickedSlot &&
     data.pickedSlot.from &&
     data.pickedSlot.to &&
-    typeof data.pickedSlot.price !== "undefined";
+    typeof data.pickedSlot.price !== "undefined" &&
+    data.pickedSlotId
+  );
 
-  const [bookingId] = useState(() => {
-    const n = Math.floor(1000 + Math.random() * 9000);
-    return `TMP-${n}`;
-  });
+  const [bookingId] = useState(
+    () => `BK-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+  );
 
-const [firstName, setFirstName] = useState(user?.firstName || "");
-const [lastName, setLastName] = useState(user?.lastName || "");
-const [phone, setPhone] = useState(user?.phone || "");
+  const [fullName, setFullName] = useState(
+    savedUser?.full_name || savedUser?.fullName || ""
+  );
+  const [phone, setPhone] = useState(savedUser?.phone || "");
 
   const [p2, setP2] = useState("");
   const [p3, setP3] = useState("");
   const [p4, setP4] = useState("");
 
   const [agree, setAgree] = useState(false);
+  const [submitErr, setSubmitErr] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const player1 = `${firstName} ${lastName}`.trim();
+  useEffect(() => {
+    const u = user || getSavedUser();
+    if (u?.full_name) setFullName(u.full_name);
+    if (u?.phone) setPhone(u.phone);
+  }, [user]);
+
+  const pickedDateObj = isValidDraft ? new Date(data.pickedDateISO) : null;
+  const pickedDateText = pickedDateObj ? pickedDateObj.toLocaleDateString() : "-";
 
   const errors = {};
+  const player1 = (fullName || "").trim();
 
-  if (!firstName.trim()) errors.firstName = "First name is required.";
-  if (!lastName.trim()) errors.lastName = "Last name is required.";
+  if (!player1) errors.fullName = "Full name is required.";
 
   const rawPhone = (phone || "").replace(/\s/g, "");
   const okPhone = /^07\d{8}$/.test(rawPhone);
@@ -51,75 +98,101 @@ const [phone, setPhone] = useState(user?.phone || "");
 
   if (!agree) errors.agree = "You must agree to the booking policy.";
 
-  const canSubmit = Object.keys(errors).length === 0;
+  const canSubmit = Object.keys(errors).length === 0 && !submitting;
 
-  const pickedDateObj = isValidDraft ? new Date(data.pickedDateISO) : null;
-  const pickedDateText = pickedDateObj ? pickedDateObj.toLocaleDateString() : "-";
-
-  useEffect(() => {
-    if (!isValidDraft) return;
-  }, [isValidDraft]);
-
- const backToSlots = () => {
-  if (data?.returnTo) {
-    navigate(data.returnTo, { state: { goToStep: "slots" } });
-  } else {
-    navigate(-1);
-  }
-};
- const handleSubmit = (e) => {
-  e.preventDefault();
-  if (!canSubmit || !isValidDraft) return;
-
-  const slot = data.pickedSlot;
-  const timeText = `${slot.from} – ${slot.to}`;
-  const costText = `${slot.price}JD`;
-
-  const newReservation = {
-    id: `R-${Date.now()}`,
-    clubId: data.clubId,
-    clubName: data.clubName,
-    clubLogo: data.clubLogo || "",
-    courtId: data.courtId,
-    courtName: data.courtName,
-    courtImage: data.courtImage || "",
-    dateISO: data.pickedDateISO,
-    slot: data.pickedSlot,
-    status: "Active",
-    bookedBy: player1,
-    phone: rawPhone,
-    players: [player1, p2, p3, p4].filter((x) => x && x.trim()),
+  const backToSlots = () => {
+    if (data?.returnTo) {
+      navigate(data.returnTo, { state: { goToStep: "slots" } });
+    } else {
+      navigate(-1);
+    }
   };
 
-  if (setReservations) {
-    setReservations((prev) => [newReservation, ...prev]);
-  }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitErr("");
 
-  if (setUser) {
-    setUser((prev) => ({
-      ...prev,
-      firstName,
-      lastName,
-      phone: rawPhone,
-    }));
-  }
+    if (!isValidDraft || !canSubmit || submitting) return;
 
-  navigate("/reservation-success", {
-    state: {
-      bookingId,
-      clubId: data.clubId,
-      clubName: data.clubName,
-      courtId: data.courtId,
-      courtName: data.courtName,
-      date: pickedDateText,
-      time: timeText,
-      cost: costText,
-      name: player1,
-      phone: rawPhone,
-      players: [player1, p2, p3, p4].filter((x) => x && x.trim()),
-    },
-  });
-};
+    const headers = getAuthHeaders(savedUser);
+    if (!headers) {
+      setSubmitErr("Missing login info. Please logout and login again.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
+      const dateISO = String(data.pickedDateISO).slice(0, 10);
+
+      const playersArr = [player1, p2, p3, p4]
+        .map((x) => (x || "").trim())
+        .filter(Boolean);
+
+      const body = {
+        club_id: Number(data.clubId),
+        court_id: Number(data.courtId),
+        slot_id: Number(data.pickedSlotId),
+        date_iso: dateISO,
+
+        booked_by_name: player1,
+        phone: rawPhone,
+
+        player1: playersArr[0] || null,
+        player2: playersArr[1] || null,
+        player3: playersArr[2] || null,
+        player4: playersArr[3] || null,
+      };
+
+      const res = await fetch(`${API}/reservations`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const result = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setSubmitErr(result?.message || result?.error || "Reservation failed");
+        return;
+      }
+
+      // update user in state + localStorage
+      const updatedUser = {
+        ...(savedUser || {}),
+        full_name: player1,
+        phone: rawPhone,
+        role: savedUser?.role || "user",
+      };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      if (typeof setUser === "function") setUser(updatedUser);
+
+      const slot = data.pickedSlot;
+      const timeText = `${slot.from} – ${slot.to}`;
+      const costText = `${slot.price}JD`;
+
+      const successPayload = {
+        bookingId: result?.booking_id || bookingId,
+        reservation_id: result?.reservation_id,
+        clubId: data.clubId,
+        clubName: data.clubName,
+        courtId: data.courtId,
+        courtName: data.courtName,
+        date: pickedDateText,
+        time: timeText,
+        cost: costText,
+        name: player1,
+        phone: rawPhone,
+      };
+
+      localStorage.setItem(SUCCESS_KEY, JSON.stringify(successPayload));
+      navigate("/reservation-success", { state: successPayload });
+    } catch (err) {
+      setSubmitErr(err?.message || "Reservation failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (!isValidDraft) {
     return (
@@ -128,7 +201,12 @@ const [phone, setPhone] = useState(user?.phone || "");
           <div className="cr-card">
             <h2 className="cr-title">No reservation selected</h2>
             <p className="cr-sub">Go back and pick a date and time first.</p>
-            <button className="cr-btn" onClick={() => navigate(-1)} type="button">
+
+            <button className="cr-btn" onClick={() => navigate("/clubs")} type="button">
+              Go to clubs
+            </button>
+
+            <button className="cr-back" onClick={() => navigate(-1)} type="button">
               Back
             </button>
           </div>
@@ -144,7 +222,6 @@ const [phone, setPhone] = useState(user?.phone || "");
   return (
     <div className="cr-page">
       <div className="cr-wrap">
-        {/* HEADER */}
         <div className="cr-progress">
           <div className="cr-progressTop">
             <div>
@@ -183,26 +260,16 @@ const [phone, setPhone] = useState(user?.phone || "");
           </div>
         </div>
 
-        {/* BODY */}
         <div className="cr-layout">
-          {/* LEFT FORM */}
           <form className="cr-card" onSubmit={handleSubmit}>
             <div className="cr-section">
               <div className="cr-sectionTitle">Your Details</div>
               <p className="cr-sectionSub">We’ll use this to confirm your booking.</p>
 
-              <div className="cr-grid2">
-                <div className="cr-field">
-                  <label>First Name *</label>
-                  <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" />
-                  {errors.firstName && <div className="cr-err">{errors.firstName}</div>}
-                </div>
-
-                <div className="cr-field">
-                  <label>Last Name *</label>
-                  <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" />
-                  {errors.lastName && <div className="cr-err">{errors.lastName}</div>}
-                </div>
+              <div className="cr-field">
+                <label>Full Name *</label>
+                <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Full name" />
+                {errors.fullName && <div className="cr-err">{errors.fullName}</div>}
               </div>
 
               <div className="cr-field">
@@ -255,14 +322,14 @@ const [phone, setPhone] = useState(user?.phone || "");
                 <span>I agree to the booking policy (cancellation must be at least 24 hours before the slot).</span>
               </label>
               {errors.agree && <div className="cr-err">{errors.agree}</div>}
+              {submitErr && <div className="cr-err">{submitErr}</div>}
             </div>
 
             <button className="cr-btn" type="submit" disabled={!canSubmit}>
-              Confirm Reservation
+              {submitting ? "Confirming..." : "Confirm Reservation"}
             </button>
           </form>
 
-          {/* RIGHT SUMMARY */}
           <aside className="cr-summary">
             <div className="cr-ticket">
               <div className="cr-ticketTop">

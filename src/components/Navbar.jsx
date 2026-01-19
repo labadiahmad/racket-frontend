@@ -8,45 +8,58 @@ export default function Navbar() {
   const isCourts = pathname.startsWith("/courts") || pathname.includes("/courts/");
   const isClubs = pathname.startsWith("/clubs") && !isCourts;
   const isAdmin = pathname.startsWith("/admin");
-const handleLogout = () => {
-  localStorage.removeItem("user");
-  localStorage.removeItem("owner");
-  window.location.href = "/login";
-};
+
+  const user = JSON.parse(localStorage.getItem("user"));
+  const isLoggedIn = !!user;
+
   return (
     <div className="nb-wrap">
       <div className="nb-bar">
+        {/* LEFT */}
         <div className="nb-left">
           <img src={logo} alt="Racket logo" className="nb-logo" />
           <span className="nb-name">Racket</span>
         </div>
 
-        <div className="nb-links">
-          <NavLink to="/" className={({ isActive }) => `nb-link ${isActive ? "active" : ""}`}>
-            Home
-          </NavLink>
+        {/* CENTER */}
+        <div className="nb-center">
+          <div className="nb-links">
+            <NavLink to="/" className={({ isActive }) => `nb-link ${isActive ? "active" : ""}`}>
+              Home
+            </NavLink>
 
-          <Link to="/clubs" className={`nb-link ${isClubs ? "active" : ""}`}>
-            Clubs
-          </Link>
+            <Link to="/clubs" className={`nb-link ${isClubs ? "active" : ""}`}>
+              Clubs
+            </Link>
 
-          <Link to="/courts" className={`nb-link ${isCourts ? "active" : ""}`}>
-            Courts
-          </Link>
+            <Link to="/courts" className={`nb-link ${isCourts ? "active" : ""}`}>
+              Courts
+            </Link>
 
-          <NavLink to="/contact" className={({ isActive }) => `nb-link ${isActive ? "active" : ""}`}>
-            Contact Us
-          </NavLink>
+            <NavLink to="/contact" className={({ isActive }) => `nb-link ${isActive ? "active" : ""}`}>
+              Contact Us
+            </NavLink>
 
-          <Link to="/login" className="nb-login">Sign In</Link>
-
-          <Link to="/admin" className={`nb-admin ${isAdmin ? "active" : ""}`}>
-            Admin
-          </Link>
-          <button onClick={handleLogout}>Logout</button>
+            <Link to="/admin" className={`nb-admin ${isAdmin ? "active" : ""}`}>
+              Admin
+            </Link>
+          </div>
         </div>
 
-        <Link to="/profile" className="nb-profile" aria-label="Profile">👤</Link>
+        {/* RIGHT */}
+        <div className="nb-right">
+          {!isLoggedIn && (
+            <Link to="/login" className="nb-login">
+              Sign In
+            </Link>
+          )}
+
+          {isLoggedIn && (
+            <Link to="/profile" className="nb-profile" aria-label="Profile">
+              👤
+            </Link>
+          )}
+        </div>
       </div>
     </div>
   );

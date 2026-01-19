@@ -64,6 +64,7 @@
   display:flex;
   align-items:center;
   gap: 10px;
+  flex-wrap: nowrap;
 }
 
 .nb-link{
@@ -174,4 +175,17 @@
 .nb-login:hover{
   transform: translateY(-2px);
   background: rgba(21,34,51,.08);
+}
+.nb-center{
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.nb-right{
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 140px;
 }

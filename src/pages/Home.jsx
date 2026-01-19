@@ -147,13 +147,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="rk-field">
-                  <div className="rk-field-label">Date</div>
-                  <div className="rk-pill-input">
-                    <span className="rk-field-ic">🗓️</span>
-                    <input value={homeDate} onChange={(e) => setHomeDate(e.target.value)} type="date" />
-                  </div>
-                </div>
 
                 <div className="rk-field">
                   <div className="rk-field-label">Court Type</div>

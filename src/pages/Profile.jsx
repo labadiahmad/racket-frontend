@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./profile.css";
 import {
   Container,
@@ -16,7 +17,7 @@ import {
 /* =========================
    CONFIG
 ========================= */
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5050";
+const API_BASE = import.meta.env.VITE_API_URL;
 const API = `${API_BASE}/api`;
 
 /* =========================
@@ -31,8 +32,8 @@ function authHeaders(extra = {}) {
   const u = getSavedUser();
   return {
     "Content-Type": "application/json",
-    ...(u?.user_id ? { "x-user-id": String(u.user_id) } : {}),
-    ...(u?.role ? { "x-role": String(u.role) } : {}),
+    "x-user-id": String(u?.user_id || ""),
+    "x-role": String(u?.role || "user"),
     ...extra,
   };
 }
@@ -74,7 +75,6 @@ export default function Profile({ user, setUser }) {
 
   const [draft, setDraft] = useState(user);
 
-  // reservations from backend
   const [reservations, setReservations] = useState([]);
   const [resLoading, setResLoading] = useState(false);
   const [resErr, setResErr] = useState("");
@@ -82,18 +82,34 @@ export default function Profile({ user, setUser }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("All");
 
-  // edit reservation modal (optional)
   const [openEditRes, setOpenEditRes] = useState(false);
   const [resDraft, setResDraft] = useState(null);
 
-  // keep draft synced
+  const navigate = useNavigate();
+
+
+function handleDeleteUI() {
+  if (!resDraft?.reservation_id) return;
+
+  const ok = window.confirm(
+    `Delete reservation #${resDraft.reservation_id}?\n\n(UI only الآن - لن يحذف من قاعدة البيانات)`
+  );
+  if (!ok) return;
+
+  setReservations((prev) =>
+    (prev || []).filter((x) => x.reservation_id !== resDraft.reservation_id)
+  );
+
+  closeReschedule();
+}
+
+
   useEffect(() => {
     setDraft(user);
   }, [user]);
 
   /* =========================
-     LOAD USER (ME) + RESERVATIONS
-     IMPORTANT: backend uses /users/me (NOT /users/:id)
+     LOAD USER + RESERVATIONS
   ========================= */
   useEffect(() => {
     let alive = true;
@@ -110,7 +126,7 @@ export default function Profile({ user, setUser }) {
 
       try {
         // 1) get user from backend
-        const me = await apiGet("/users/me"); // ✅ correct endpoint
+        const me = await apiGet("/users/me"); 
         if (!alive) return;
 
         // backend returns { user: {...} }
@@ -120,14 +136,30 @@ export default function Profile({ user, setUser }) {
         setUser(freshUser);
         setDraft(freshUser);
 
-        // 2) get reservations for this user
-        setResLoading(true);
-        setResErr("");
+// 2) get reservations for this user
+try {
+  setResLoading(true);
+  setResErr("");
 
-        const rr = await apiGet("/reservations"); // ✅ backend returns only this user reservations when role=user
-        if (!alive) return;
+  const rr = await apiGet("/reservations");
+  if (!alive) return;
 
-        setReservations(Array.isArray(rr.reservations) ? rr.reservations : []);
+  const list = Array.isArray(rr)
+    ? rr
+    : Array.isArray(rr.reservations)
+    ? rr.reservations
+    : [];
+
+  setReservations(list);
+  console.log("RES LIST:", list);
+} catch (e) {
+  if (!alive) return;
+  setResErr(e.message || "Failed to load reservations");
+  setReservations([]);
+} finally {
+  if (!alive) return;
+  setResLoading(false);
+}
       } catch (e) {
         if (!alive) return;
         setErr(e.message || "Failed to load profile");
@@ -147,15 +179,36 @@ export default function Profile({ user, setUser }) {
   /* =========================
      LOGOUT
   ========================= */
-  const logout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("owner");
-    window.location.reload();
-  };
+const logout = () => {
+  localStorage.removeItem("user");
+  localStorage.removeItem("owner");
 
+  if (typeof setUser === "function") setUser(null);
+
+  navigate("/", { replace: true });
+};
+  async function deleteReservation(reservationId) {
+  if (!reservationId) return;
+
+  const ok = window.confirm(`Delete reservation #${reservationId}?`);
+  if (!ok) return;
+
+  try {
+    // REAL delete from backend
+    await apiSend(`/reservations/${reservationId}`, { method: "DELETE" });
+
+    // remove from UI
+    setReservations((prev) =>
+      (prev || []).filter((x) => x.reservation_id !== reservationId)
+    );
+
+    closeReschedule();
+  } catch (e) {
+    alert(e.message || "Failed to delete reservation");
+  }
+}
   /* =========================
-     SAVE PROFILE (backend)
-     backend PUT /users/me expects: full_name, email, phone, profile_image
+      PROFILE
   ========================= */
   const saveProfile = async () => {
     const full_name = (draft?.full_name || "").trim();
@@ -192,7 +245,7 @@ export default function Profile({ user, setUser }) {
   };
 
   /* =========================
-     RESERVATIONS LIST (NO useMemo)
+     RESERVATIONS LIST 
   ========================= */
   function getList() {
     let arr = (reservations || []).slice();
@@ -223,14 +276,12 @@ export default function Profile({ user, setUser }) {
      OPTIONAL: LOCAL UI EDIT MODAL (only UI)
      (Because your backend currently does NOT have user edit/cancel endpoints)
   ========================= */
-  function openReschedule(r) {
-    setResDraft({
-      reservation_id: r.reservation_id,
-      date_iso: (r.date_iso || "").slice(0, 10),
-      slot_id: r.slot_id ? String(r.slot_id) : "",
-    });
-    setOpenEditRes(true);
-  }
+function openReschedule(r) {
+  setResDraft({
+    reservation_id: r.reservation_id,
+  });
+  setOpenEditRes(true);
+}
 
   function closeReschedule() {
     setOpenEditRes(false);
@@ -439,9 +490,9 @@ export default function Profile({ user, setUser }) {
                           </div>
 
                           <div className="pf-bookActions">
-                            <Button size="sm" variant="primary" onClick={() => openReschedule(r)}>
-                              Edit (UI)
-                            </Button>
+                            <Button size="sm" variant="outline-danger" onClick={() => openReschedule(r)}>
+  Delete
+</Button>
                           </div>
                         </div>
 
@@ -507,54 +558,38 @@ export default function Profile({ user, setUser }) {
             </Col>
           </Row>
         )}
+<Modal show={openEditRes && !!resDraft} onHide={closeReschedule} centered>
+  <Modal.Header closeButton className="pf-modalHeader">
+    <Modal.Title className="pf-modalTitle">Delete reservation</Modal.Title>
+  </Modal.Header>
 
-        {/* EDIT RESERVATION MODAL (UI ONLY now) */}
-        <Modal show={openEditRes && !!resDraft} onHide={closeReschedule} centered>
-          <Modal.Header closeButton>
-            <Modal.Title>Edit reservation (UI only)</Modal.Title>
-          </Modal.Header>
+  <Modal.Body className="pf-modalBody">
+    {resDraft && (
+      <>
+        <div className="pf-modalSub">
+          You are about to delete reservation <strong>#{resDraft.reservation_id}</strong>.
+        </div>
 
-          <Modal.Body>
-            {resDraft && (
-              <>
-                <div className="pf-muted mb-2">Reservation #{resDraft.reservation_id}</div>
+        <div className="pf-warnBox">
+          This action will remove it from the database and it cannot be undone.
+        </div>
 
-                <Row className="g-3">
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>Date</Form.Label>
-                      <Form.Control
-                        type="date"
-                        value={resDraft.date_iso}
-                        onChange={(e) => setResDraft((p) => ({ ...p, date_iso: e.target.value }))}
-                      />
-                    </Form.Group>
-                  </Col>
+        <div className="pf-modalActions">
+          <Button
+            variant="danger"
+            onClick={() => deleteReservation(resDraft.reservation_id)}
+          >
+            Delete
+          </Button>
 
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>Slot ID</Form.Label>
-                      <Form.Control
-                        value={resDraft.slot_id}
-                        onChange={(e) => setResDraft((p) => ({ ...p, slot_id: e.target.value }))}
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-
-                <div className="pf-muted mt-3">
-                  If you want this to really update DB, we must add a backend PUT endpoint.
-                </div>
-              </>
-            )}
-          </Modal.Body>
-
-          <Modal.Footer>
-            <Button variant="outline-secondary" onClick={closeReschedule}>
-              Close
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          <Button variant="outline-secondary" onClick={closeReschedule}>
+            Cancel
+          </Button>
+        </div>
+      </>
+    )}
+  </Modal.Body>
+</Modal>
       </Container>
     </div>
   );

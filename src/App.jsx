@@ -33,21 +33,6 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [owner, setOwner] = useState(null);
 
-  const [reservationDraft, setReservationDraft] = useState({
-    clubId: null,
-    clubName: "",
-    clubLogo: "",
-    courtId: "",
-    courtName: "",
-    courtImage: "",
-    pickedDateISO: null,
-    pickedSlotId: null,
-    pickedSlot: null,
-  });
-
-  const [reservations, setReservations] = useState([]);
-
-  // Load auth from localStorage on first load
   useEffect(() => {
     const rawUser = localStorage.getItem("user");
     const rawOwner = localStorage.getItem("owner");
@@ -90,7 +75,7 @@ export default function App() {
 
       <Route path="/admin/signup" element={<OwnerSignup />} />
 
-      {/* USER PAGES */}
+      {/* USER LAYOUT */}
       <Route
         element={
           <UserLayout
@@ -102,66 +87,42 @@ export default function App() {
         }
       >
         <Route path="/" element={<Home />} />
-        <Route path="/clubs" element={<Clubs />} />
-        <Route path="/courts" element={<Courts />} />
-        <Route path="/contact" element={<Contact />} />
-
-       <Route
-  path="/profile"
-  element={
-    user ? (
-      <Profile
-        user={user}
-        setUser={setUser}
-      />
-    ) : (
-      <Navigate to="/login" replace />
-    )
-  }
-/>
+        <Route path="clubs" element={<Clubs />} />
+        <Route path="courts" element={<Courts />} />
+        <Route path="contact" element={<Contact />} />
 
         <Route
-          path="/clubs/:id"
-          element={
-            <ClubDetails
-              user={user}
-              reservationDraft={reservationDraft}
-              setReservationDraft={setReservationDraft}
-            />
-          }
-        />
-
-        <Route
-          path="/clubs/:clubId/courts/:courtId"
-          element={
-            <CourtDetails
-              user={user}
-              reservationDraft={reservationDraft}
-              setReservationDraft={setReservationDraft}
-            />
-          }
-        />
-
-        <Route
-          path="/confirm-reservation"
+          path="profile"
           element={
             user ? (
-              <ConfirmReservation
-                reservationDraft={reservationDraft}
-                setReservations={setReservations}
-                user={user}
-                setUser={setUser}
-              />
+              <Profile user={user} setUser={setUser} />
             ) : (
               <Navigate to="/login" replace />
             )
           }
         />
 
-        <Route path="/reservation-success" element={<ReservationSuccess />} />
+        <Route path="clubs/:id" element={<ClubDetails user={user} />} />
+        <Route
+          path="clubs/:clubId/courts/:courtId"
+          element={<CourtDetails user={user} />}
+        />
+
+        <Route
+          path="confirm-reservation"
+          element={
+            user ? (
+              <ConfirmReservation user={user} setUser={setUser} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+
+        <Route path="reservation-success" element={<ReservationSuccess />} />
       </Route>
 
-      {/* ADMIN PAGES */}
+      {/* ADMIN */}
       <Route
         path="/admin"
         element={
@@ -179,10 +140,7 @@ export default function App() {
         <Route path="courts/:courtId" element={<AdminCourtDetails />} />
         <Route path="reservations" element={<AdminReservations />} />
         <Route path="reservations/add" element={<AdminAddReservation />} />
-        <Route
-          path="reservations/:bookingId"
-          element={<AdminReservationDetails />}
-        />
+        <Route path="reservations/:bookingId" element={<AdminReservationDetails />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />
