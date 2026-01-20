@@ -182,6 +182,7 @@ try {
 const logout = () => {
   localStorage.removeItem("user");
   localStorage.removeItem("owner");
+  localStorage.removeItem("reservationDraft");
 
   if (typeof setUser === "function") setUser(null);
 

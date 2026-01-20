@@ -1,72 +1,219 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ownerHome.css";
-import projectLogo from "../assets/clubs/project-padel.png";
 
-export default function AdminDashboard() {
+const API_BASE = import.meta.env.VITE_API_URL;
+const API = `${API_BASE}/api`;
+
+function getOwner() {
+  try {
+    return JSON.parse(localStorage.getItem("owner"));
+  } catch {
+    return null;
+  }
+}
+
+function headersJson() {
+  const o = getOwner();
+  return {
+    "Content-Type": "application/json",
+    "x-user-id": String(o?.user_id || ""),
+    "x-role": "owner",
+  };
+}
+
+function headersNoJson() {
+  const o = getOwner();
+  return {
+    "x-user-id": String(o?.user_id || ""),
+    "x-role": "owner",
+  };
+}
+
+function fileUrl(p) {
+  if (!p) return "";
+  if (p.startsWith("http")) return p;
+  return `${API_BASE}${p}`;
+}
+
+// ---------- helpers for reservations ----------
+function playersText(r) {
+  const arr = [r.player1, r.player2, r.player3, r.player4].filter(Boolean);
+  return arr.length ? arr.join(" • ") : "—";
+}
+
+function dateText(r) {
+  return formatDateOnly(r.date_iso) || "—";
+}
+
+function timeRangeText(r) {
+  const from = formatTime(r.time_from || r.start_time);
+  const to = formatTime(r.time_to || r.end_time);
+  if (from === "—" && to === "—") return "—";
+  return `${from} → ${to}`;
+}
+
+function formatDateOnly(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString();
+  } catch {
+    return "";
+  }
+}
+
+function formatTime(t) {
+  if (!t) return "—";
+  // "08:00:00" -> "08:00"
+  const s = String(t);
+  return s.length >= 5 ? s.slice(0, 5) : s;
+}
+
+function startEndText(r) {
+  // date_iso + time_from/time_to
+  const date = formatDateOnly(r.date_iso);
+  const from = formatTime(r.time_from || r.start_time); // fallback for old key
+  const to = formatTime(r.time_to || r.end_time);       // fallback for old key
+  if (!date && (from === "—" && to === "—")) return "—";
+  if (!date) return `${from} → ${to}`;
+  return `${date} • ${from} → ${to}`;
+}
+
+function courtText(r) {
+  return r.court_name || (r.court_id ? `#${r.court_id}` : "—");
+}
+
+function totalText(r) {
+  const v = r.total_price ?? r.total ?? r.price;
+  if (v === undefined || v === null || v === "") return "—";
+  const n = Number(v);
+  return Number.isFinite(n) ? `${n} JD` : "—";
+}
+
+export default function OwnerHome() {
   const navigate = useNavigate();
 
-  const club = {
-    name: "Project Padel",
-    location: "KHBP",
-    description: "Indoor courts, clean facilities, and fast booking.",
-    image: projectLogo,
-  };
+  const [club, setClub] = useState(null);
+  const [courts, setCourts] = useState([]);
+  const [reservations, setReservations] = useState([]);
 
-  const [courts, setCourts] = useState([
-    { id: "court1", name: "Court 1", type: "Indoor", price: "25 JD / hour", isActive: true },
-    { id: "court2", name: "Court 2", type: "Indoor", price: "25 JD / hour", isActive: true },
-    { id: "court3", name: "Court 3", type: "Indoor", price: "30 JD / hour", isActive: true },
-    { id: "court4", name: "Court 4", type: "Outdoor", price: "20 JD / hour", isActive: false },
-    { id: "court5", name: "Court 5", type: "Indoor", price: "35 JD / hour", isActive: true },
-  ]);
-
-  const [reservations] = useState([
-    { bookingId: "BK-10491", customer: "Nour Abusoud", court: "Court 1", date: "2025-12-27", time: "21:00 - 22:00" },
-    { bookingId: "BK-10492", customer: "Razan", court: "Court 2", date: "2025-12-28", time: "08:00 - 09:00" },
-    { bookingId: "BK-10493", customer: "Elias", court: "Court 3", date: "2025-12-29", time: "18:00 - 19:00" },
-    { bookingId: "BK-1055", customer: "Nour Abusoud", court: "Court 1", date: "2025-12-27", time: "21:00 - 22:00" },
-    { bookingId: "BK-104925", customer: "Razan", court: "Court 2", date: "2025-12-28", time: "08:00 - 09:00" },
-    { bookingId: "BK-104936", customer: "Elias", court: "Court 3", date: "2025-12-29", time: "18:00 - 19:00" },
-  ]);
-
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   const COURTS_PER_PAGE = 3;
   const [courtsPage, setCourtsPage] = useState(0);
+
+  const [resQuery, setResQuery] = useState("");
+
+  useEffect(() => {
+    const o = getOwner();
+    if (!o?.user_id) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    let alive = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+        setErr("");
+
+        const res = await fetch(`${API}/owner/dashboard`, {
+          headers: headersNoJson(),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || data.error || "Failed to load dashboard");
+        if (!alive) return;
+
+        setClub(data.club || null);
+        setCourts(Array.isArray(data.courts) ? data.courts : []);
+        const res2 = await fetch(`${API}/reservations`, { headers: headersNoJson() });
+        const resData = await res2.json().catch(() => ([]));
+if (!res2.ok) throw new Error(resData.message || resData.error || "Failed to load reservations");
+
+        setReservations(Array.isArray(resData) ? resData : []);
+        setCourtsPage(0);
+      } catch (e) {
+        if (!alive) return;
+        setErr(e.message || "Server error");
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, [navigate]);
 
   const courtsPages = Math.max(1, Math.ceil(courts.length / COURTS_PER_PAGE));
   const courtsStart = courtsPage * COURTS_PER_PAGE;
   const courtsView = courts.slice(courtsStart, courtsStart + COURTS_PER_PAGE);
 
-  const prevCourts = () => setCourtsPage((p) => (p - 1 + courtsPages) % courtsPages);
-  const nextCourts = () => setCourtsPage((p) => (p + 1) % courtsPages);
+  function prevCourts() {
+    setCourtsPage((p) => (p - 1 + courtsPages) % courtsPages);
+  }
+  function nextCourts() {
+    setCourtsPage((p) => (p + 1) % courtsPages);
+  }
 
-  const toggleCourt = (courtId) => {
-    setCourts((prev) => prev.map((c) => (c.id === courtId ? { ...c, isActive: !c.isActive } : c)));
-  };
+  async function toggleCourt(court) {
+    try {
+      const res = await fetch(`${API}/courts/${court.court_id}`, {
+        method: "PUT",
+        headers: headersJson(),
+        body: JSON.stringify({ is_active: !court.is_active }),
+      });
 
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || data.error || "Failed to update court");
 
-  const [resQuery, setResQuery] = useState("");
+      const updated = data.court || data;
 
+      setCourts((prev) => prev.map((c) => (c.court_id === updated.court_id ? updated : c)));
+    } catch (e) {
+      alert(e.message || "Failed");
+    }
+  }
+
+  // ✅ filter reservations (now includes players, court_name, start/end, total)
   const q = resQuery.trim().toLowerCase();
   const filteredReservations = !q
     ? reservations
     : reservations.filter((r) => {
-        const all = `${r.bookingId} ${r.customer} ${r.court} ${r.date} ${r.time}`.toLowerCase();
-        return all.includes(q);
+        const text = `
+          ${r.reservation_id || ""}
+          ${r.booking_id || ""}
+          ${r.booked_by_name || ""}
+          ${r.status || ""}
+          ${r.court_id || ""}
+          ${r.court_name || ""}
+          ${r.date_iso || ""}
+          ${r.time_from || r.start_time || ""}
+          ${r.time_to || r.end_time || ""}
+          ${r.total_price || r.total || r.price || ""}
+          ${r.player1 || ""} ${r.player2 || ""} ${r.player3 || ""} ${r.player4 || ""}
+        `.toLowerCase();
+        return text.includes(q);
       });
+
+  if (loading) return <div style={{ padding: 120 }}>Loading owner dashboard...</div>;
+  if (err) return <div style={{ padding: 120, color: "crimson" }}>{err}</div>;
 
   return (
     <div className="admin-page">
-      {/* HERO */}
       <header className="admin-hero">
         <div className="admin-heroText">
           <div className="admin-heroTop">
             <div>
               <h1 className="admin-title">Club Owner Dashboard</h1>
-              <p className="admin-sub">
-                Manage your club details, courts, and reservations in one place.
-              </p>
+              <p className="admin-sub">Manage your club, courts, and reservations.</p>
             </div>
           </div>
 
@@ -96,23 +243,32 @@ export default function AdminDashboard() {
             </button>
           </div>
 
-          <div className="admin-clubCard">
-            <div className="admin-clubLogoWrap">
-              <img className="admin-clubLogo" src={club.image} alt="Club logo" />
-            </div>
+          {!club ? (
+            <div className="admin-empty">No club found for this owner.</div>
+          ) : (
+            <div className="admin-clubCard">
+              <div className="admin-clubLogoWrap">
+                <img
+                  className="admin-clubLogo"
+                  src={club.logo_url ? fileUrl(club.logo_url) : "/vite.svg"}
+                  alt="Club logo"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                />
+              </div>
 
-            <div className="admin-clubInfo">
-              <div className="admin-clubName">{club.name}</div>
-              <div className="admin-clubMeta">📍 {club.location}</div>
-              <div className="admin-clubDesc">{club.description}</div>
+              <div className="admin-clubInfo">
+                <div className="admin-clubName">{club.name}</div>
+                <div className="admin-clubMeta">📍 {club.city} • {club.address}</div>
+                <div className="admin-clubDesc">{club.about || "No description yet."}</div>
 
-              <div className="admin-actions">
-                <button className="admin-outlineBtn" type="button" onClick={() => navigate("/admin/club")}>
-                  Edit Club
-                </button>
+                <div className="admin-actions">
+                  <button className="admin-outlineBtn" type="button" onClick={() => navigate("/admin/club")}>
+                    Edit Club
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </section>
 
         {/* COURTS */}
@@ -138,46 +294,46 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="admin-grid">
-            {courtsView.map((c) => (
-              <div
-                key={c.id}
-                className={`admin-card ${c.isActive ? "" : "isHidden"}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/admin/courts/${c.id}`)}
-                onKeyDown={(e) => e.key === "Enter" && navigate(`/admin/courts/${c.id}`)}
-                
-              >
-                <div className="admin-cardTop">
-                  <div className="admin-cardTitle">{c.name}</div>
-                  <div className="admin-badge">{c.type}</div>
+          {courts.length === 0 ? (
+            <div className="admin-empty">No courts yet. Add your first one.</div>
+          ) : (
+            <div className="admin-grid">
+              {courtsView.map((c) => (
+                <div
+                  key={c.court_id}
+                  className={`admin-card ${c.is_active ? "" : "isHidden"}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/admin/courts/${c.court_id}`)}
+                  onKeyDown={(e) => e.key === "Enter" && navigate(`/admin/courts/${c.court_id}`)}
+                >
+                  <div className="admin-cardTop">
+                    <div className="admin-cardTitle">{c.name}</div>
+                    <div className="admin-badge">{c.type || "Court"}</div>
+                  </div>
+
+                  <div className="admin-cardLine">🏷️ {c.surface || "—"} • Max: {c.max_players || 4}</div>
+
+                  <div className="admin-cardBtns" onClick={(e) => e.stopPropagation()}>
+                    <button className="admin-outlineBtn" type="button" onClick={() => navigate(`/admin/courts/${c.court_id}`)}>
+                      Edit
+                    </button>
+                  </div>
+
+                  <button
+                    className={`admin-toggle ${c.is_active ? "on" : "off"}`}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCourt(c);
+                    }}
+                  >
+                    {c.is_active ? "Hide" : "Make Active"}
+                  </button>
                 </div>
-
-                <div className="admin-cardLine">💰 {c.price}</div>
-
-                <div className="admin-cardBtns" onClick={(e) => e.stopPropagation()}>
-  <button
-    className="admin-outlineBtn"
-    type="button"
-    onClick={() => navigate(`/admin/courts/${c.id}`)}
-  >
-    Edit
-  </button>
-</div>
-
-<button
-  className={`admin-toggle ${c.isActive ? "on" : "off"}`}
-  type="button"
-  onClick={(e) => {
-    toggleCourt(c.id);
-  }}
->
-  {c.isActive ? "Hide" : "Make Active"}
-</button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {courtsPages > 1 && (
             <div className="admin-dots">
@@ -217,7 +373,7 @@ export default function AdminDashboard() {
                 <input
                   value={resQuery}
                   onChange={(e) => setResQuery(e.target.value)}
-                  placeholder="Search by booking id, customer, court, date, or time..."
+                  placeholder="Search id, name, court, players, status..."
                 />
               </div>
 
@@ -229,31 +385,34 @@ export default function AdminDashboard() {
             <div className="admin-tableScroll">
               <div className="admin-table">
                 <div className="admin-row admin-rowHead">
-                  <div>Booking</div>
-                  <div>Customer</div>
-                  <div>Court</div>
-                  <div>Date</div>
-                  <div>Time</div>
-                </div>
+  <div>ID</div>
+  <div>Players</div>
+  <div>Court</div>
+  <div>Date</div>
+  <div>Start - End</div>
+  <div>Total</div>
+  <div>Status</div>
+</div>
 
                 {filteredReservations.length === 0 ? (
                   <div className="admin-empty">No results found.</div>
                 ) : (
-                  filteredReservations.map((r) => (
+                  filteredReservations.slice(0, 8).map((r) => (
                     <div
                       className="admin-row admin-rowClickable"
-                      key={r.bookingId}
+                      key={r.reservation_id}
                       role="button"
                       tabIndex={0}
-                      onClick={() => navigate(`/admin/reservations/${r.bookingId}`)}
-                      onKeyDown={(e) => e.key === "Enter" && navigate(`/admin/reservations/${r.bookingId}`)}
-                      title="Open reservation details"
+                      onClick={() => navigate(`/admin/reservations/${r.reservation_id}`)}
+                      onKeyDown={(e) => e.key === "Enter" && navigate(`/admin/reservations/${r.reservation_id}`)}
                     >
-                      <div><b>{r.bookingId}</b></div>
-                      <div>{r.customer}</div>
-                      <div>{r.court}</div>
-                      <div>{r.date}</div>
-                      <div>{r.time}</div>
+                      <div><b>{r.reservation_id}</b></div>
+                      <div title={playersText(r)}>{playersText(r)}</div>
+                      <div>{courtText(r)}</div>
+                      <div>{dateText(r)}</div>
+                      <div>{timeRangeText(r)}</div>
+                      <div>{totalText(r)}</div>
+                      <div>{r.status || "—"}</div>
                     </div>
                   ))
                 )}

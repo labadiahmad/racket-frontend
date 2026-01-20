@@ -1,477 +1,656 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./ownerClub.css";
 
-import tropicoCover from "../assets/courts/redCourt.jpeg";
-import tropicoCover2 from "../assets/courts/3.jpeg";
-import projectCover from "../assets/courts/SCR-20251203-uebn.jpeg";
-import wepadelCover from "../assets/courts/wepadel-court-cover.jpg";
-import tropicoLogo from "../assets/clubs/tropico.png";
+const API_BASE = import.meta.env.VITE_API_URL;
+const API = `${API_BASE}/api`;
 
-export default function AdminClub() {
-  const initialClub = useMemo(
-    () => ({
-      id: "1",
-      name: "Tropico Padel Club",
-      logo: tropicoLogo,
-      rating: 4.9,
-      reviews: 120,
-      about:
-        "Tropico Padel Club offers modern courts, easy booking, and a fun playing experience for all levels.",
-      address: "Tropico Padel Club Al-Madina Street, District 5, Amman, Jordan",
-      mapsUrl: "https://www.google.com/maps",
-      whatsapp: "+962 792133190",
-      phone: "+962 792133190",
-      gallery: [tropicoCover, projectCover, wepadelCover, tropicoCover2],
-      facilities: ["Parking", "Café", "Lockers", "Bathrooms", "Seating area", "Shop"],
-      clubRules: [
-        "Free cancellation up to 24 hours before the slot.",
-        "Late arrivals do not extend the booking time.",
-        "No-shows may be charged the full amount.",
-        "Refunds (if any) are processed within 3–5 working days.",
-      ],
-      courts: [
-        { id: "court1", name: "Court 1", type: "Outdoor Premium Court", priceFrom: 30 },
-        { id: "court2", name: "Court 2", type: "Indoor Court", priceFrom: 35 },
-      ],
-    }),
-    []
-  );
+function safeJson(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
-  const [club, setClub] = useState(initialClub);
+function getOwner() {
+  const raw = localStorage.getItem("owner");
+  return raw ? safeJson(raw) : null;
+}
 
-  const [isEditing, setIsEditing] = useState(false);
-  const [draft, setDraft] = useState(initialClub);
-
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [activeImg, setActiveImg] = useState(0);
-
-  const viewClub = isEditing ? draft : club;
-
-  const update = (key, value) => setDraft((p) => ({ ...p, [key]: value }));
-
-  const joinLines = (arr) => (arr || []).join("\n");
-  const splitLines = (text) =>
-    (text || "")
-      .split("\n")
-      .map((x) => x.trim())
-      .filter(Boolean);
-
-  const startEdit = () => {
-    setDraft(club);
-    setIsEditing(true);
+function authHeaders(json = true) {
+  const o = getOwner();
+  const h = {
+    "x-role": "owner",
+    "x-user-id": String(o?.user_id || ""),
   };
+  if (json) h["Content-Type"] = "application/json";
+  return h;
+}
 
-  const cancelEdit = () => {
-    setDraft(club);
-    setIsEditing(false);
-  };
+function fileUrl(p) {
+  if (!p) return "";
+  if (p.startsWith("http")) return p;
+  return `${API_BASE}${p}`;
+}
 
-  const saveEdit = () => {
-    setClub(draft);
-    setIsEditing(false);
-    console.log("save", draft);
-  };
+async function apiGet(path) {
+  const res = await fetch(`${API}${path}`, { headers: authHeaders(false) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || "Request failed");
+  return data;
+}
 
-  const deletePhoto = (index) => {
-    setDraft((p) => {
-      const nextGallery = (p.gallery || []).filter((_, i) => i !== index);
+async function apiPost(path, body) {
+  const res = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: authHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || "Request failed");
+  return data;
+}
 
-      setActiveImg((curr) => {
-        const maxIndex = Math.max(0, nextGallery.length - 1);
-        if (curr > maxIndex) return maxIndex;
-        if (index < curr) return curr - 1;
-        if (index === curr) return 0;
-        return curr;
-      });
+async function apiPut(path, body) {
+  const res = await fetch(`${API}${path}`, {
+    method: "PUT",
+    headers: authHeaders(true),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || "Request failed");
+  return data;
+}
 
-      return { ...p, gallery: nextGallery };
-    });
-  };
+async function apiDelete(path) {
+  const res = await fetch(`${API}${path}`, {
+    method: "DELETE",
+    headers: authHeaders(false),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || "Request failed");
+  return data;
+}
 
-  const openGalleryAt = (i) => {
-    setActiveImg(i);
-    setGalleryOpen(true);
-  };
+async function uploadFile(file, folder = "clubs") {
+  const o = getOwner();
+  if (!o?.user_id) throw new Error("Owner session missing");
+
+  const form = new FormData();
+  form.append("file", file);
+
+  const res = await fetch(`${API}/upload?folder=${folder}`, {
+    method: "POST",
+    headers: {
+      "x-role": "owner",
+      "x-user-id": String(o.user_id),
+    },
+    body: form,
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || data.error || "Upload failed");
+  return data.url;
+}
+
+function joinLines(arr) {
+  return (arr || []).join("\n");
+}
+
+function splitLines(text) {
+  return (text || "")
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+export default function OwnerClub() {
+  const navigate = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+
+  const [club, setClub] = useState(null);
+  const [clubImages, setClubImages] = useState([]);
+  const [facilities, setFacilities] = useState([]);
+
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  const [deletingId, setDeletingId] = useState(null);
+
+  const [draft, setDraft] = useState({
+    name: "",
+    city: "",
+    address: "",
+    about: "",
+    phone_number: "",
+    maps_url: "",
+    whatsapp: "",
+    rules: "",
+    is_active: true,
+    logo_url: "",
+    cover_url: "",
+    facilitiesText: "",
+  });
+
+  useEffect(() => {
+    const o = getOwner();
+    if (!o?.user_id) {
+      navigate("/login", { replace: true });
+      return;
+    }
+
+    let alive = true;
+
+    async function loadAll() {
+      try {
+        setLoading(true);
+        setErr("");
+        setMsg("");
+
+        const dash = await apiGet("/owner/dashboard");
+        const myClub = dash.club;
+
+        if (!myClub) throw new Error("No club found for this owner.");
+
+        const [imgs, facs] = await Promise.all([
+          apiGet(`/club-images?club_id=${myClub.club_id}`),
+          apiGet(`/club-facilities?club_id=${myClub.club_id}`),
+        ]);
+
+        if (!alive) return;
+
+        const imgsArr = Array.isArray(imgs) ? imgs : [];
+        const facsArr = Array.isArray(facs) ? facs : [];
+
+        setClub(myClub);
+        setClubImages(imgsArr);
+        setFacilities(facsArr);
+
+        setDraft({
+          name: myClub.name || "",
+          city: myClub.city || "",
+          address: myClub.address || "",
+          about: myClub.about || "",
+          phone_number: myClub.phone_number || "",
+          maps_url: myClub.maps_url || "",
+          whatsapp: myClub.whatsapp || "",
+          rules: myClub.rules || "",
+          is_active: myClub.is_active ?? true,
+          logo_url: myClub.logo_url || "",
+          cover_url: myClub.cover_url || "",
+          facilitiesText: joinLines(facsArr.map((f) => f.label)),
+        });
+      } catch (e) {
+        if (!alive) return;
+        setErr(e.message || "Failed to load");
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
+    }
+
+    loadAll();
+    return () => {
+      alive = false;
+    };
+  }, [navigate]);
+
+  function onDraft(k, v) {
+    setDraft((p) => ({ ...p, [k]: v }));
+  }
+
+  async function handleLogoChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      setErr("");
+      setMsg("");
+      const url = await uploadFile(file, "clubs");
+      onDraft("logo_url", url);
+      setMsg("Logo uploaded. Click Save to apply.");
+    } catch (e2) {
+      setErr(e2.message || "Logo upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleCoverChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      setErr("");
+      setMsg("");
+      const url = await uploadFile(file, "clubs");
+      onDraft("cover_url", url);
+      setMsg("Cover uploaded. Click Save to apply.");
+    } catch (e2) {
+      setErr(e2.message || "Cover upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleAddGalleryImages(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !club?.club_id) return;
+
+    try {
+      setUploading(true);
+      setErr("");
+      setMsg("");
+
+      const createdList = [];
+      for (const f of files) {
+        const url = await uploadFile(f, "clubs");
+        const created = await apiPost("/club-images", {
+          club_id: club.club_id,
+          image_url: url,
+          position: 0,
+        });
+        createdList.push(created);
+      }
+
+      setClubImages((prev) => [...prev, ...createdList]);
+      setMsg("Gallery updated ✅");
+    } catch (e2) {
+      setErr(e2.message || "Gallery upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function deleteGalleryImage(image_id) {
+    if (!image_id) return;
+
+    const ok = window.confirm("Delete this image?");
+    if (!ok) return;
+
+    setErr("");
+    setMsg("");
+
+    const before = clubImages;
+    setClubImages((prev) => prev.filter((x) => x.image_id !== image_id));
+
+    try {
+      setDeletingId(image_id);
+      await apiDelete(`/club-images/${image_id}`);
+      setMsg("Image deleted ✅");
+    } catch (e) {
+      setClubImages(before);
+      setErr(e.message || "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleSave() {
+    if (!club?.club_id) return;
+
+    try {
+      setSaving(true);
+      setErr("");
+      setMsg("");
+
+      const payload = {
+        name: draft.name.trim(),
+        city: draft.city.trim(),
+        address: draft.address.trim(),
+        about: draft.about?.trim() || null,
+        phone_number: draft.phone_number?.trim() || null,
+        maps_url: draft.maps_url?.trim() || null,
+        whatsapp: draft.whatsapp?.trim() || null,
+        rules: draft.rules?.trim() || null,
+        is_active: !!draft.is_active,
+        logo_url: draft.logo_url || null,
+        cover_url: draft.cover_url || null,
+      };
+
+      if (!payload.name || !payload.city || !payload.address) {
+        setErr("Please fill Club Name, City, and Address.");
+        return;
+      }
+
+      const updated = await apiPut(`/clubs/${club.club_id}`, payload);
+      const fresh = updated.club || updated;
+
+      const wantedLabels = splitLines(draft.facilitiesText);
+
+      for (const f of facilities) {
+        await apiDelete(`/club-facilities/${f.facility_id}`);
+      }
+
+      const newFacilities = [];
+      for (const label of wantedLabels) {
+        const created = await apiPost("/club-facilities", {
+          club_id: club.club_id,
+          label,
+          icon: "✅",
+        });
+        newFacilities.push(created);
+      }
+
+      setClub(fresh);
+      setFacilities(newFacilities);
+      setEditing(false);
+      setMsg("Saved successfully ✅");
+    } catch (e) {
+      setErr(e.message || "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="oc-state">Loading...</div>;
+  if (err && !club) return <div className="oc-state oc-stateErr">{err}</div>;
+  if (!club) return <div className="oc-state">No club found.</div>;
+
+  const logoSrc = draft.logo_url ? fileUrl(draft.logo_url) : "";
+  const coverSrc = draft.cover_url ? fileUrl(draft.cover_url) : "";
 
   return (
-    <div className="ac-page">
-      <div className="ac-shell">
-        {/* HERO */}
-        <div className="ac-hero">
-          <div>
-            <div className="ac-heroTitle">Admin • Club</div>
-            <div className="ac-heroSub">
-              {isEditing
-                ? "Edit mode: update the info then press Save."
-                : "View mode: this is the same club data that users see."}
-            </div>
+    <div className="oc-page">
+      <div className="oc-shell">
+
+        {/* Top bar */}
+        <div className={`oc-hero ${editing ? "isEditing" : ""}`}>
+          <div className="oc-heroLeft">
+            <div className="oc-title">My Club</div>
+            <div className="oc-sub">View and edit your club details.</div>
           </div>
 
-          <div className="ac-heroRight">
-            {!isEditing ? (
-              <>
-                
-                <button className="ac-btn ac-btnPrimary" type="button" onClick={startEdit}>
-                  Edit
-                </button>
-              </>
+          <div className="oc-heroActions">
+            {!editing ? (
+              <button className="oc-btn oc-btnPrimary" onClick={() => setEditing(true)}>
+                Edit
+              </button>
             ) : (
               <>
-                <button className="ac-btn ac-btnOutline" type="button" onClick={cancelEdit}>
+                <button
+                  className="oc-btn oc-btnGhost"
+                  onClick={() => setEditing(false)}
+                  disabled={saving || uploading}
+                >
                   Cancel
                 </button>
-                <button className="ac-btn ac-btnPrimary" type="button" onClick={saveEdit}>
-                  Save
+                <button
+                  className="oc-btn oc-btnPrimary"
+                  onClick={handleSave}
+                  disabled={saving || uploading}
+                >
+                  {saving ? "Saving..." : "Save"}
                 </button>
               </>
             )}
           </div>
         </div>
 
-        {/* GRID */}
-        <div className={`ac-grid ${isEditing ? "is-editing" : ""}`}>
-          {/* CLUB CARD (always visible) */}
-          <div className="ac-card ac-clubCard">
-            <div className="ac-cardHead">
-              <div className="ac-cardTitle">Club Details</div>
-
-              
-              
-            </div>
-
-            {/* Top Preview Row */}
-            <div className="ac-clubTop">
-              <div className="ac-clubLogoWrap">
-                <img className="ac-clubLogo" src={viewClub.logo} alt="club logo" />
-              </div>
-
-              <div>
-                <div className="ac-clubName">{viewClub.name}</div>
-
-                {!isEditing && (
-                  <>
-                    <div className="ac-clubMeta">
-                      ⭐ {viewClub.rating} • {viewClub.reviews} reviews • {viewClub.courts.length} courts
-                    </div>
-                    <div className="ac-clubAbout">{viewClub.about}</div>
-
-                    <div className="ac-actions">
-                    
-                    </div>
-                  </>
-                )}
-
-                {isEditing && (
-                  <div className="ac-miniNote">
-                    Tip: Fill the fields below. Press <b>Save</b> on the top right.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* EDIT UI */}
-            {isEditing && (
-              <div className="ac-editWrap">
-                <div className="ac-editBanner">
-                  <div className="ac-editTitle">Editing Club Information</div>
-                  <div className="ac-editSub">Update details, then press Save (top right).</div>
-                </div>
-
-                {/* Basic Info */}
-                <div className="ac-section">
-                  <div className="ac-sectionHead">
-                    <div className="ac-sectionTitle">Basic Info</div>
-                    <div className="ac-sectionHint">Name, address, contact links</div>
-                  </div>
-
-                  <div className="ac-sectionBody ac-2col">
-                    <div>
-                      <div className="ac-fieldLabel">Club Name</div>
-                      <input
-                        className="ac-input"
-                        value={draft.name}
-                        onChange={(e) => update("name", e.target.value)}
-                        placeholder="Enter club name"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="ac-fieldLabel">Phone</div>
-                      <input
-                        className="ac-input"
-                        value={draft.phone}
-                        onChange={(e) => update("phone", e.target.value)}
-                        placeholder="+962 ..."
-                      />
-                    </div>
-
-                    <div className="ac-span2">
-                      <div className="ac-fieldLabel">Address</div>
-                      <input
-                        className="ac-input"
-                        value={draft.address}
-                        onChange={(e) => update("address", e.target.value)}
-                        placeholder="Full address"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="ac-fieldLabel">Maps URL</div>
-                      <input
-                        className="ac-input"
-                        value={draft.mapsUrl}
-                        onChange={(e) => update("mapsUrl", e.target.value)}
-                        placeholder="https://maps.google.com/..."
-                      />
-                    </div>
-
-                    <div>
-                      <div className="ac-fieldLabel">WhatsApp</div>
-                      <input
-                        className="ac-input"
-                        value={draft.whatsapp}
-                        onChange={(e) => update("whatsapp", e.target.value)}
-                        placeholder="+962 ..."
-                      />
-                    </div>
-
-                    <div className="ac-span2">
-                      <div className="ac-fieldLabel">About</div>
-                      <textarea
-                        className="ac-textarea"
-                        rows={4}
-                        value={draft.about}
-                        onChange={(e) => update("about", e.target.value)}
-                        placeholder="Short description of the club..."
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Rules + Facilities */}
-                <div className="ac-section">
-                  <div className="ac-sectionHead">
-                    <div className="ac-sectionTitle">Rules & Facilities</div>
-                    <div className="ac-sectionHint">One item per line</div>
-                  </div>
-
-                  <div className="ac-sectionBody ac-2col">
-                    <div>
-                      <div className="ac-fieldLabel">Facilities</div>
-                      <textarea
-                        className="ac-textarea"
-                        rows={6}
-                        value={joinLines(draft.facilities)}
-                        onChange={(e) => update("facilities", splitLines(e.target.value))}
-                        placeholder={"Parking\nCafé\nLockers"}
-                      />
-                    </div>
-
-                    <div>
-                      <div className="ac-fieldLabel">Club Rules</div>
-                      <textarea
-                        className="ac-textarea"
-                        rows={6}
-                        value={joinLines(draft.clubRules)}
-                        onChange={(e) => update("clubRules", splitLines(e.target.value))}
-                        placeholder={"Free cancellation up to 24 hours...\nNo-shows may be charged..."}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Gallery Manager */}
-                <div className="ac-section">
-                  <div className="ac-sectionHead">
-                    <div className="ac-sectionTitle">Gallery Manager</div>
-                    <div className="ac-sectionHint">{(draft.gallery || []).length} photos</div>
-                  </div>
-
-                  <div className="ac-sectionBody">
-                    <div className="ac-photoTools">
-                      <label className="ac-uploadBtn">
-                        + Upload Photos
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(e) => {
-                            const files = Array.from(e.target.files || []);
-                            if (!files.length) return;
-
-                            setDraft((p) => ({
-                              ...p,
-                              gallery: [...(p.gallery || []), ...files.map((f) => URL.createObjectURL(f))],
-                            }));
-
-                            e.target.value = "";
-                          }}
-                          style={{ display: "none" }}
-                        />
-                      </label>
-
-                      <div className="ac-uploadHint">Tip: upload multiple images at once.</div>
-                    </div>
-
-                    <div className="ac-photoListNice">
-                      {(draft.gallery || []).map((img, i) => (
-                        <div key={i} className="ac-photoRowNice">
-                          <div className="ac-photoThumbLg" style={{ backgroundImage: `url(${img})` }} />
-                          <div className="ac-photoInfo">
-                            <div className="ac-photoTitle">Photo {i + 1}</div>
-                            <div className="ac-photoSub">Press Save to apply changes</div>
-                          </div>
-                          <button className="ac-delBtn" type="button" onClick={() => deletePhoto(i)}>
-                            Delete
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+        {/* messages */}
+        {(err || msg) && (
+          <div className={`oc-alert ${err ? "isErr" : "isOk"}`}>
+            {err ? err : msg}
           </div>
+        )}
 
-          {/* VIEW MODE ONLY: RIGHT + BOTTOM CARDS */}
-          {!isEditing && (
-            <>
-              {/* STATS */}
-              <div className="ac-card ac-stats">
-                <div className="ac-cardTitle">Quick Stats</div>
+        {/* Cover card */}
+        {!editing && coverSrc && (
+          <div className="oc-cover">
+            <img className="oc-coverImg" src={coverSrc} alt="Club cover" />
+            <div className="oc-coverOverlay" />
 
-                <div className="ac-statGrid">
-                  <div className="ac-stat">
-                    <div className="ac-statNum">{viewClub.courts.length}</div>
-                    <div className="ac-statLabel">Courts</div>
-                  </div>
-                  <div className="ac-stat">
-                    <div className="ac-statNum">{viewClub.rating}</div>
-                    <div className="ac-statLabel">Rating</div>
-                  </div>
-                  <div className="ac-stat">
-                    <div className="ac-statNum">{viewClub.reviews}</div>
-                    <div className="ac-statLabel">Reviews</div>
-                  </div>
-                </div>
-
-                <div className="ac-statBtns">
-                  <button className="ac-btn ac-btnPrimary" type="button">
-                    Manage Courts
-                  </button>
-                </div>
+            <div className="oc-coverContent">
+              <div>
+                <div className="oc-coverTitle">{club.name}</div>
+                <div className="oc-coverMeta">📍 {club.city} • {club.address}</div>
               </div>
-
-              {/* GALLERY */}
-              <div className="ac-card ac-gallery">
-                <div className="ac-cardHead">
-                  <div className="ac-cardTitle">
-                    Gallery <span className="ac-count">({(viewClub.gallery || []).length} photos)</span>
-                  </div>
-                  <button className="ac-link" type="button" onClick={() => setGalleryOpen(true)}>
-                    View all
-                  </button>
-                </div>
-
-                <div className="ac-galleryScroll">
-                  {(viewClub.gallery || []).map((img, i) => (
-                    <div
-                      key={i}
-                      className="ac-thumb ac-thumbWide"
-                      style={{ backgroundImage: `url(${img})` }}
-                      onClick={() => openGalleryAt(i)}
-                      role="button"
-                      tabIndex={0}
-                    />
-                  ))}
-                </div>
-
-                <div className="ac-galleryHint">Scroll to see more →</div>
-              </div>
-
-              {/* CONTACT */}
-              <div className="ac-card ac-contact">
-                <div className="ac-cardTitle">Contact</div>
-
-                <div className="ac-row">
-                  <div className="ac-k">WhatsApp</div>
-                  <div className="ac-v">{viewClub.whatsapp}</div>
-                </div>
-
-                <div className="ac-row">
-                  <div className="ac-k">Phone</div>
-                  <div className="ac-v">{viewClub.phone}</div>
-                </div>
-
-                <a className="ac-mapBtn" href={viewClub.mapsUrl} target="_blank" rel="noreferrer">
-                  📍 Open Maps
-                </a>
-              </div>
-
-              {/* FACILITIES */}
-              <div className="ac-card ac-fac">
-                <div className="ac-cardHead">
-                  <div className="ac-cardTitle">Facilities</div>
-                </div>
-
-                <div className="ac-facGrid">
-                  {(viewClub.facilities || []).map((f, i) => (
-                    <div key={i} className="ac-pill">
-                      ✅ {f}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* CLUB RULES */}
-<div className="ac-card ac-rules">
-  <div className="ac-cardHead">
-    <div>
-      <div className="ac-cardTitle">Club Rules</div>
-      <div className="ac-cardSub">What players must follow</div>
-    </div>
-  </div>
-
-  <ul className="ac-bulletList">
-    {(viewClub.clubRules || []).map((r, i) => (
-      <li key={i}>{r}</li>
-    ))}
-  </ul>
-</div>
-
-        {/* MODAL (view mode only is fine, but keeping it working always) */}
-        {galleryOpen && (
-          <div className="ac-modal" onMouseDown={() => setGalleryOpen(false)}>
-            <div className="ac-modalInner" onMouseDown={(e) => e.stopPropagation()}>
-              <button className="ac-close" type="button" onClick={() => setGalleryOpen(false)}>
-                ✕
-              </button>
-
-              <button
-                className="ac-arrow left"
-                type="button"
-                onClick={() =>
-                  setActiveImg((i) => (i - 1 + (viewClub.gallery || []).length) % (viewClub.gallery || []).length)
-                }
-              >
-                ‹
-              </button>
-
-              <img className="ac-modalImg" src={(viewClub.gallery || [])[activeImg]} alt="" />
-
-              <button
-                className="ac-arrow right"
-                type="button"
-                onClick={() => setActiveImg((i) => (i + 1) % (viewClub.gallery || []).length)}
-              >
-                ›
-              </button>
             </div>
           </div>
         )}
+
+        {/* Main layout */}
+        <div className={`oc-grid ${editing ? "isEditing" : ""}`}>
+
+          {/* Left column */}
+          <div className="oc-col">
+
+            {/* Overview */}
+            <div className="oc-card">
+              <div className="oc-cardHead">
+                <div>
+                  <div className="oc-cardTitle">Club Overview</div>
+                  <div className="oc-cardSub">Owner view for your club info and images.</div>
+                </div>
+
+                {!editing && (
+                  <div className="oc-quickBtns">
+                    <button className="oc-btn oc-btnSmall" onClick={() => navigate("/admin/courts")}>
+                      Manage Courts
+                    </button>
+                    <button className="oc-btn oc-btnSmall" onClick={() => navigate("/admin/reservations")}>
+                      Manage Reservations
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="oc-overview">
+                <div className="oc-logoBox">
+                  {logoSrc ? (
+                    <img className="oc-logo" src={logoSrc} alt="Club logo" />
+                  ) : (
+                    <div className="oc-logoFallback">🏟️</div>
+                  )}
+                </div>
+
+                <div className="oc-info">
+                  {!editing ? (
+                    <>
+                      <div className="oc-name">{club.name}</div>
+                      <div className="oc-meta">📍 {club.city} • {club.address}</div>
+                      <div className="oc-about">{club.about || "No description yet."}</div>
+                    </>
+                  ) : (
+                    <div className="oc-form">
+                      <div className="oc-formRow">
+                        <div>
+                          <div className="oc-label">Club Name *</div>
+                          <input className="oc-input" value={draft.name} onChange={(e) => onDraft("name", e.target.value)} />
+                        </div>
+                        <div>
+                          <div className="oc-label">City *</div>
+                          <input className="oc-input" value={draft.city} onChange={(e) => onDraft("city", e.target.value)} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="oc-label">Address *</div>
+                        <input className="oc-input" value={draft.address} onChange={(e) => onDraft("address", e.target.value)} />
+                      </div>
+
+                      <div>
+                        <div className="oc-label">About</div>
+                        <textarea className="oc-textarea" value={draft.about} onChange={(e) => onDraft("about", e.target.value)} />
+                      </div>
+
+                      <div className="oc-formRow">
+                        <div>
+                          <div className="oc-label">Phone</div>
+                          <input className="oc-input" value={draft.phone_number} onChange={(e) => onDraft("phone_number", e.target.value)} />
+                        </div>
+                        <div>
+                          <div className="oc-label">WhatsApp</div>
+                          <input className="oc-input" value={draft.whatsapp} onChange={(e) => onDraft("whatsapp", e.target.value)} />
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="oc-label">Maps URL</div>
+                        <input className="oc-input" value={draft.maps_url} onChange={(e) => onDraft("maps_url", e.target.value)} />
+                      </div>
+
+                      <div>
+                        <div className="oc-label">Rules</div>
+                        <textarea className="oc-textarea" value={draft.rules} onChange={(e) => onDraft("rules", e.target.value)} />
+                      </div>
+
+                      <div className="oc-formRow">
+                        <div>
+                          <div className="oc-label">Visibility</div>
+                          <select
+                            className="oc-input"
+                            value={draft.is_active ? "true" : "false"}
+                            onChange={(e) => onDraft("is_active", e.target.value === "true")}
+                          >
+                            <option value="true">Active</option>
+                            <option value="false">Hidden</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <div className="oc-label">Facilities (one per line)</div>
+                          <textarea
+                            className="oc-textarea"
+                            rows={4}
+                            value={draft.facilitiesText}
+                            onChange={(e) => onDraft("facilitiesText", e.target.value)}
+                            placeholder={"Parking\nCafe\nBathrooms"}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="oc-uploadRow">
+                        <label className="oc-uploadBtn">
+                          {uploading ? "Uploading..." : "Upload Logo"}
+                          <input type="file" accept="image/*" onChange={handleLogoChange} disabled={uploading} />
+                        </label>
+
+                        <label className="oc-uploadBtn">
+                          {uploading ? "Uploading..." : "Upload Cover"}
+                          <input type="file" accept="image/*" onChange={handleCoverChange} disabled={uploading} />
+                        </label>
+                      </div>
+
+                      {draft.cover_url && (
+                        <div className="oc-preview">
+                          <img className="oc-previewImg" src={fileUrl(draft.cover_url)} alt="Cover preview" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Gallery */}
+            {!editing && (
+              <div className="oc-card">
+                <div className="oc-cardHead">
+                  <div>
+                    <div className="oc-cardTitle">Gallery ({clubImages.length})</div>
+                    <div className="oc-cardSub">Upload or delete club images.</div>
+                  </div>
+
+                  <label className="oc-uploadBtn">
+                    {uploading ? "Uploading..." : "+ Upload"}
+                    <input type="file" accept="image/*" multiple onChange={handleAddGalleryImages} disabled={uploading} />
+                  </label>
+                </div>
+
+                {clubImages.length === 0 ? (
+                  <div className="oc-empty">No gallery images yet.</div>
+                ) : (
+                  <div className="oc-gallery">
+                    {clubImages.map((img) => (
+                      <div key={img.image_id} className="oc-imgCard">
+                        <img className="oc-img" src={fileUrl(img.image_url)} alt="Gallery" />
+                        <div className="oc-imgActions">
+                          <button
+                            className="oc-delBtn"
+                            type="button"
+                            onClick={() => deleteGalleryImage(img.image_id)}
+                            disabled={deletingId === img.image_id}
+                          >
+                            {deletingId === img.image_id ? "Deleting..." : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right column */}
+          {!editing && (
+            <div className="oc-side">
+              <div className="oc-card">
+                <div className="oc-cardHead">
+                  <div>
+                    <div className="oc-cardTitle">Facilities</div>
+                    <div className="oc-cardSub">What your club provides.</div>
+                  </div>
+                </div>
+
+                {facilities.length === 0 ? (
+                  <div className="oc-empty">No facilities yet.</div>
+                ) : (
+                  <div className="oc-pills">
+                    {facilities.map((f) => (
+                      <span key={f.facility_id} className="oc-pill">
+                        ✅ {f.label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="oc-card">
+                <div className="oc-cardHead">
+                  <div>
+                    <div className="oc-cardTitle">Contact</div>
+                    <div className="oc-cardSub">Quick links for your customers.</div>
+                  </div>
+                </div>
+
+                <div className="oc-kv">
+                  <div className="oc-k">Phone</div>
+                  <div className="oc-v">{club.phone_number || "—"}</div>
+                </div>
+                <div className="oc-kv">
+                  <div className="oc-k">WhatsApp</div>
+                  <div className="oc-v">{club.whatsapp || "—"}</div>
+                </div>
+                <div className="oc-kv">
+                  <div className="oc-k">Maps</div>
+                  <div className="oc-v">
+                    {club.maps_url ? (
+                      <a className="oc-link" href={club.maps_url} target="_blank" rel="noreferrer">
+                        Open
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   );
