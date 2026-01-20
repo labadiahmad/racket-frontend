@@ -1,10 +1,10 @@
 import { Outlet } from "react-router-dom";
-import AdminNav from "../components/AdminNav";
+import AdminNavbar from "../components/AdminNav";
 
-export default function AdminLayout() {
+export default function OwnerLayout({ owner, setOwner }) {
   return (
     <>
-      <AdminNav />
+      <AdminNavbar setOwner={setOwner} />
       <Outlet />
     </>
   );

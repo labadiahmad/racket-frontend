@@ -8,16 +8,13 @@ const API = `${API_BASE}/api`;
 export default function OwnerSignup({ setOwner }) {
     const navigate = useNavigate();
 
-  // steps: 1 = owner account, 2 = club info
   const [step, setStep] = useState(1);
 
-  // STEP 1 (owner)
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
 
-  // STEP 2 (club)
   const [clubName, setClubName] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
@@ -82,9 +79,7 @@ export default function OwnerSignup({ setOwner }) {
   return data;
 }
 
-  // =========================
-  // STEP 1: CREATE OWNER
-  // =========================
+
   async function submitOwner(e) {
     e.preventDefault();
     setErr("");
@@ -122,9 +117,6 @@ export default function OwnerSignup({ setOwner }) {
     }
   }
 
-  // =========================
-  // STEP 2: CREATE CLUB
-  // =========================
   async function submitClub(e) {
     e.preventDefault();
     setErr("");

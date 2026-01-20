@@ -33,19 +33,17 @@ export default function Home() {
   const fixUrl = (url) => {
     if (!url) return "";
     if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    if (url.startsWith("/uploads")) return API + url; // "/uploads/.." => "http://localhost:5050/uploads/.."
+    if (url.startsWith("/uploads")) return API + url; 
     return url;
   };
 
   useEffect(() => {
     async function loadHomeData() {
       try {
-        // clubs
         const clubsRes = await fetch(`${API}/api/clubs`);
         const clubsData = await clubsRes.json().catch(() => []);
         if (!clubsRes.ok) throw new Error(clubsData?.message || "Failed to load clubs");
 
-        // courts
         const courtsRes = await fetch(`${API}/api/courts`);
         const courtsData = await courtsRes.json().catch(() => []);
         if (!courtsRes.ok) throw new Error(courtsData?.message || "Failed to load courts");

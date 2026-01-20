@@ -3,16 +3,12 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import "./courtDetails.css";
 import starIcon from "../assets/clubs/star.png";
 
-/* =========================
-   CONFIG
-========================= */
+
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5050";
 const API = `${API_BASE}/api`;
 const DRAFT_KEY = "reservationDraft";
 
-/* =========================
-   HELPERS
-========================= */
+
 function safeArr(x) {
   return Array.isArray(x) ? x : [];
 }
@@ -61,7 +57,6 @@ function parseMaybeArray(val) {
   return [];
 }
 
-/* ----- localStorage draft ----- */
 function getDraft() {
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
@@ -76,7 +71,6 @@ function setDraft(nextDraft) {
   return nextDraft;
 }
 
-/* ----- auth + api ----- */
 function getSavedUser() {
   try {
     const raw = localStorage.getItem("user");
@@ -103,15 +97,12 @@ async function apiGet(path) {
   return data;
 }
 
-/* =========================
-   COMPONENT
-========================= */
+
 export default function CourtDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const { clubId, courtId } = useParams();
 
-  /* ---------- DB DATA ---------- */
   const [club, setClub] = useState(null);
   const [courts, setCourts] = useState([]);
   const [court, setCourt] = useState(null);
@@ -119,25 +110,20 @@ export default function CourtDetails() {
   const [courtImages, setCourtImages] = useState([]);
   const [slots, setSlots] = useState([]);
 
-  /* ---------- UI ---------- */
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  /* ---------- Booking ---------- */
-  const [bookStep, setBookStep] = useState("calendar"); // "calendar" | "slots"
+  const [bookStep, setBookStep] = useState("calendar"); 
   const [pickedDate, setPickedDate] = useState(null);
   const [pickedSlotId, setPickedSlotId] = useState(null);
   const [bookedSlotIds, setBookedSlotIds] = useState([]);
 
-  /* ---------- Calendar ---------- */
   const [calMonthOffset, setCalMonthOffset] = useState(0);
 
-  /* ---------- Gallery ---------- */
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryShow, setGalleryShow] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
 
-  /* ---------- Weather ---------- */
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherErr, setWeatherErr] = useState("");
@@ -167,9 +153,7 @@ export default function CourtDetails() {
     return "✅";
   }
 
-  /* =========================
-     1) LOAD CLUB + COURTS + SELECT COURT
-  ========================= */
+
   useEffect(() => {
     let alive = true;
 
@@ -209,9 +193,7 @@ export default function CourtDetails() {
     };
   }, [clubId, courtId]);
 
-  /* =========================
-     2) LOAD COURT IMAGES + SLOTS
-  ========================= */
+ 
   useEffect(() => {
     let alive = true;
 
@@ -244,11 +226,7 @@ export default function CourtDetails() {
     };
   }, [court?.court_id]);
 
-  /* =========================
-     3) RESTORE DRAFT (localStorage)
-     - only if draft matches this club+court
-     - also support return from confirm page: state.goToStep === "slots"
-  ========================= */
+
   useEffect(() => {
     if (!club?.club_id || !court?.court_id) return;
 
@@ -272,17 +250,14 @@ export default function CourtDetails() {
     else setBookStep("calendar");
   }, [club?.club_id, court?.court_id, location.state]);
 
-  /* Clear route state once (to avoid infinite re-trigger) */
   useEffect(() => {
     if (location.state?.goToStep) {
       navigate(location.pathname, { replace: true, state: null });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+ 
   }, []);
 
-  /* =========================
-     4) LOAD BOOKED SLOTS when date changes
-  ========================= */
+
   useEffect(() => {
     async function loadBooked() {
       if (!pickedDate || !court?.court_id) {
@@ -315,9 +290,7 @@ export default function CourtDetails() {
     loadBooked();
   }, [pickedDate, court?.court_id]);
 
-  /* =========================
-     5) CALENDAR DATA
-  ========================= */
+ 
   const today = startOfDay(new Date());
   const maxDate = new Date(today);
   maxDate.setDate(maxDate.getDate() + 15);
@@ -352,7 +325,6 @@ export default function CourtDetails() {
     return x >= today && x <= maxDate;
   }
 
-  /* if month changes and current pickedDate is no longer valid */
   useEffect(() => {
     if (pickedDate && !isSelectableDate(pickedDate)) {
       setPickedDate(null);
@@ -360,12 +332,9 @@ export default function CourtDetails() {
       setWeather(null);
       setWeatherErr("");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calMonthOffset]);
 
-  /* =========================
-     6) GALLERY
-  ========================= */
+  
   const galleryList = safeArr(courtImages)
     .map((x) => x.image_url || x.url || x.path || "")
     .filter(Boolean);
@@ -406,9 +375,7 @@ export default function CourtDetails() {
     };
   }, [galleryOpen, galleryList.length]);
 
-  /* =========================
-     7) WEATHER (open-meteo)
-  ========================= */
+
   useEffect(() => {
     if (!pickedDate) {
       setWeather(null);
@@ -455,9 +422,7 @@ export default function CourtDetails() {
       .finally(() => setWeatherLoading(false));
   }, [pickedDate, club?.lat, club?.lon]);
 
-  /* =========================
-     8) ACTIONS
-  ========================= */
+
   function goBack() {
     navigate(-1);
   }
@@ -500,17 +465,13 @@ export default function CourtDetails() {
     navigate("/confirm-reservation", { state: payload });
   }
 
-  /* =========================
-     9) UI GUARDS
-  ========================= */
+  
   if (loading) return <div style={{ padding: 120 }}>Loading...</div>;
   if (err) return <div style={{ padding: 120 }}>{err}</div>;
   if (!club) return <div style={{ padding: 120 }}>Club not found</div>;
   if (!court) return <div style={{ padding: 120 }}>Court not found</div>;
 
-  /* =========================
-     10) UI READY DATA
-  ========================= */
+
   const clubRating = Number(club.avg_rating || club.rating || 0);
   const clubReviewsCount = Number(club.reviews_count || club.reviews || 0);
 

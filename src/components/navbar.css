@@ -246,3 +246,69 @@
   align-items:center;
   gap: 10px;
 }
+.nav-btnDanger {
+  color: #b91c1c;
+  background: rgba(255,255,255,.9);
+  border: 1px solid rgba(239,68,68,.3);
+}
+
+.nav-btnDanger:hover {
+  background: rgba(254,242,242,1);
+}
+.nb-signout{
+  display:flex;
+  align-items:center;
+  gap:8px;
+
+  height:40px;
+  padding:0 16px;
+  border-radius:999px;
+
+  font-weight:900;
+  font-size:14px;
+  letter-spacing:.3px;
+
+  cursor:pointer;
+  white-space:nowrap;
+
+  color:#7c2d12;
+  background: rgba(255,255,255,.75);
+  border:1px solid rgba(124,45,18,.25);
+
+  box-shadow: 0 10px 24px rgba(15,23,42,.10);
+  backdrop-filter: blur(12px);
+
+  transition:
+    background .18s ease,
+    color .18s ease,
+    transform .18s ease,
+    box-shadow .18s ease;
+}
+
+.nb-signout-ic{
+  font-size:16px;
+  opacity:.85;
+}
+
+/* Hover = danger intent */
+.nb-signout:hover{
+  background: linear-gradient(
+    180deg,
+    rgba(239,68,68,.95),
+    rgba(185,28,28,.95)
+  );
+  color:#fff;
+  border-color: rgba(239,68,68,.55);
+  transform: translateY(-1px);
+  box-shadow:
+    0 16px 40px rgba(220,38,38,.35),
+    0 0 0 3px rgba(255,255,255,.15);
+}
+
+.nb-signout:hover .nb-signout-ic{
+  opacity:1;
+}
+
+.nb-signout:active{
+  transform: translateY(0) scale(.98);
+}

@@ -14,15 +14,11 @@ import {
   Modal,
 } from "react-bootstrap";
 
-/* =========================
-   CONFIG
-========================= */
+
 const API_BASE = import.meta.env.VITE_API_URL;
 const API = `${API_BASE}/api`;
 
-/* =========================
-   HELPERS
-========================= */
+
 function getSavedUser() {
   const raw = localStorage.getItem("user");
   return raw ? JSON.parse(raw) : null;
@@ -108,9 +104,7 @@ function handleDeleteUI() {
     setDraft(user);
   }, [user]);
 
-  /* =========================
-     LOAD USER + RESERVATIONS
-  ========================= */
+ 
   useEffect(() => {
     let alive = true;
 
@@ -125,18 +119,15 @@ function handleDeleteUI() {
       setErr("");
 
       try {
-        // 1) get user from backend
         const me = await apiGet("/users/me"); 
         if (!alive) return;
 
-        // backend returns { user: {...} }
         const freshUser = me.user || me;
 
         localStorage.setItem("user", JSON.stringify(freshUser));
         setUser(freshUser);
         setDraft(freshUser);
 
-// 2) get reservations for this user
 try {
   setResLoading(true);
   setResErr("");
@@ -176,9 +167,7 @@ try {
     };
   }, []);
 
-  /* =========================
-     LOGOUT
-  ========================= */
+
 const logout = () => {
   localStorage.removeItem("user");
   localStorage.removeItem("owner");
@@ -196,10 +185,8 @@ const logout = () => {
   if (!ok) return;
 
   try {
-    // REAL delete from backend
     await apiSend(`/reservations/${reservationId}`, { method: "DELETE" });
 
-    // remove from UI
     setReservations((prev) =>
       (prev || []).filter((x) => x.reservation_id !== reservationId)
     );
@@ -209,9 +196,7 @@ const logout = () => {
     alert(e.message || "Failed to delete reservation");
   }
 }
-  /* =========================
-      PROFILE
-  ========================= */
+  
   const saveProfile = async () => {
     const full_name = (draft?.full_name || "").trim();
     const email = (draft?.email || "").trim();
@@ -230,7 +215,6 @@ const logout = () => {
         }),
       });
 
-      // backend returns { user: {...} }
       const u = updated.user || updated;
       localStorage.setItem("user", JSON.stringify(u));
       setUser(u);
@@ -246,13 +230,10 @@ const logout = () => {
     setEditing(false);
   };
 
-  /* =========================
-     RESERVATIONS LIST 
-  ========================= */
+
   function getList() {
     let arr = (reservations || []).slice();
 
-    // newest first by created_at (fallback date_iso)
     arr.sort((a, b) => {
       const aa = a.created_at || a.date_iso || "";
       const bb = b.created_at || b.date_iso || "";
@@ -274,10 +255,7 @@ const logout = () => {
 
   const list = getList();
 
-  /* =========================
-     OPTIONAL: LOCAL UI EDIT MODAL (only UI)
-     (Because your backend currently does NOT have user edit/cancel endpoints)
-  ========================= */
+
 function openReschedule(r) {
   setResDraft({
     reservation_id: r.reservation_id,
@@ -290,9 +268,7 @@ function openReschedule(r) {
     setResDraft(null);
   }
 
-  /* =========================
-     UI STATES
-  ========================= */
+
   if (loading) return <div style={{ padding: 120 }}>Loading...</div>;
   if (err) return <div style={{ padding: 120 }}>{err}</div>;
   if (!user) return <div style={{ padding: 120 }}>No user session.</div>;

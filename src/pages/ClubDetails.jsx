@@ -3,15 +3,11 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import "./clubDetails.css";
 import starIcon from "../assets/clubs/star.png";
 
-/* =========================
-   CONFIG
-========================= */
+
 const API_BASE = import.meta.env.VITE_API_URL ;
 const API = `${API_BASE}/api`;
 
-/* =========================
-   HELPERS
-========================= */
+
 function safeArr(x) {
   return Array.isArray(x) ? x : [];
 }
@@ -115,9 +111,7 @@ async function uploadReviewImage(file) {
   return data.url; 
 }
 
-/* =========================
-   COMPONENT
-========================= */
+
 export default function ClubDetails({ user }) { 
    const { id } = useParams();
   const clubId = Number(id);
@@ -125,7 +119,6 @@ export default function ClubDetails({ user }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  /* ---------- DATA (from DB only) ---------- */
   const [club, setClub] = useState(null);
   const [clubImages, setClubImages] = useState([]);
   const [facilities, setFacilities] = useState([]);
@@ -136,52 +129,44 @@ export default function ClubDetails({ user }) {
   const [courtImages, setCourtImages] = useState([]);
   const [slots, setSlots] = useState([]);
 
-  /* ---------- UI state ---------- */
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  /* ---------- booking state ---------- */
   const [bookStep, setBookStep] = useState("details"); 
   const [pickedDate, setPickedDate] = useState(null);
   const [pickedSlotId, setPickedSlotId] = useState(null);
   const [calMonthOffset, setCalMonthOffset] = useState(0);
   const [bookedSlotIds, setBookedSlotIds] = useState([]);
-  /* ---------- gallery ---------- */
+
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryShow, setGalleryShow] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
 
-  /* ---------- reviews tools ---------- */
   const [rq, setRq] = useState("");
   const [starsFilter, setStarsFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Newest");
 
-  /* ---------- weather ---------- */
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [weatherErr, setWeatherErr] = useState("");
 
-  /* ---------- add review modal ---------- */
   const [openReview, setOpenReview] = useState(false);
   const [revSaving, setRevSaving] = useState(false);
   const [revErr, setRevErr] = useState("");
   const [revDraft, setRevDraft] = useState({ stars: 5, comment: "", photos: [] });
 
-// ---------- edit review modal ----------
-const [editOpen, setEditOpen] = useState(false);
-const [editSaving, setEditSaving] = useState(false);
-const [editErr, setEditErr] = useState("");
-const [editDraft, setEditDraft] = useState({ review_id: null, stars: 5, comment: "" });
- 
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErr, setEditErr] = useState("");
+  const [editDraft, setEditDraft] = useState({ review_id: null, stars: 5, comment: "" });
+  
 const closeReview = () => {
     setOpenReview(false);
     setRevErr("");
     setRevDraft({ stars: 5, comment: "", photos: [] });
   };
 
-  /* =========================
-     1) LOAD CLUB + RELATED
-  ========================= */
+  
   useEffect(() => {
     let alive = true;
 
@@ -259,9 +244,7 @@ else setBookStep("details");
     }
   }, [location.pathname, location.state, navigate]);
 
-  /* =========================
-     2) LOAD COURT IMAGES + SLOTS
-  ========================= */
+  
   useEffect(() => {
     let alive = true;
 
@@ -294,15 +277,11 @@ else setBookStep("details");
     };
   }, [courtId]);
 
-  /* =========================
-     SELECTED COURT + SLOT
-  ========================= */
+
   const selectedCourt = courts.find((c) => String(c.court_id) === String(courtId)) || courts[0] || null;
   const pickedSlot = slots.find((s) => String(s.slot_id) === String(pickedSlotId)) || null;
 
-  /* =========================
-     CALENDAR HELPERS
-  ========================= */
+
   function getCalInfo() {
     const base = new Date();
     const first = new Date(base.getFullYear(), base.getMonth() + calMonthOffset, 1);
@@ -380,9 +359,7 @@ else setBookStep("details");
     }
   }, [calMonthOffset]); 
 
-  /* =========================
-     GALLERY
-  ========================= */
+ 
 const galleryList = (() => {
   const out = [];
 
@@ -436,9 +413,7 @@ const galleryList = (() => {
     };
   }, [galleryOpen, galleryList.length]);
 
-  /* =========================
-     WEATHER (open-meteo)
-  ========================= */
+
   useEffect(() => {
     if (!pickedDate) {
       setWeather(null);
@@ -485,9 +460,7 @@ const galleryList = (() => {
       .finally(() => setWeatherLoading(false));
   }, [pickedDate, club?.lat, club?.lon]);
 
-  /* =========================
-     REVIEWS: FILTER + SORT
-  ========================= */
+
   let filteredReviews = safeArr(reviews).slice();
 
   const query = rq.trim().toLowerCase();
@@ -518,9 +491,7 @@ const isAdmin = String(user?.role || getSavedUser()?.role || "").toLowerCase() =
     ? Math.round((filteredReviews.reduce((sum, r) => sum + Number(r.stars || 0), 0) / filteredReviews.length) * 10) / 10
     : 0;
 
-  /* =========================
-     ADD REVIEW + UPLOAD PHOTOS
-  ========================= */
+
   const onPickPhotos = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -654,9 +625,7 @@ async function deleteReview(reviewId) {
     }
   };
 
-  /* =========================
-     BOOKING CONFIRM PAYLOAD
-  ========================= */
+
   const goBackStep = () => {
     if (bookStep === "calendar") setBookStep("details");
     else if (bookStep === "slots") setBookStep("calendar");
@@ -718,16 +687,11 @@ useEffect(() => {
   loadBookedSlots(courtId, pickedDate.toISOString());
 }, [pickedDate, courtId]);
  
-  /* =========================
-     UI STATES
-  ========================= */
+
   if (loading) return <div style={{ padding: 120 }}>Loading...</div>;
   if (err) return <div style={{ padding: 120 }}>{err}</div>;
   if (!club) return <div style={{ padding: 120 }}>Club not found</div>;
 
-  /* =========================
-     RENDER
-  ========================= */
   const topRating = Number(club.avg_rating || 0);
   const topReviewsCount = Number(club.reviews_count || 0);
 

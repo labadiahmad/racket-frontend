@@ -36,7 +36,6 @@ function fileUrl(p) {
   return `${API_BASE}${p}`;
 }
 
-// ---------- helpers for reservations ----------
 function playersText(r) {
   const arr = [r.player1, r.player2, r.player3, r.player4].filter(Boolean);
   return arr.length ? arr.join(" • ") : "—";
@@ -66,16 +65,14 @@ function formatDateOnly(iso) {
 
 function formatTime(t) {
   if (!t) return "—";
-  // "08:00:00" -> "08:00"
   const s = String(t);
   return s.length >= 5 ? s.slice(0, 5) : s;
 }
 
 function startEndText(r) {
-  // date_iso + time_from/time_to
   const date = formatDateOnly(r.date_iso);
-  const from = formatTime(r.time_from || r.start_time); // fallback for old key
-  const to = formatTime(r.time_to || r.end_time);       // fallback for old key
+  const from = formatTime(r.time_from || r.start_time); 
+  const to = formatTime(r.time_to || r.end_time);       
   if (!date && (from === "—" && to === "—")) return "—";
   if (!date) return `${from} → ${to}`;
   return `${date} • ${from} → ${to}`;
@@ -182,7 +179,6 @@ if (!res2.ok) throw new Error(resData.message || resData.error || "Failed to loa
     }
   }
 
-  // ✅ filter reservations (now includes players, court_name, start/end, total)
   const q = resQuery.trim().toLowerCase();
   const filteredReservations = !q
     ? reservations
@@ -385,14 +381,14 @@ if (!res2.ok) throw new Error(resData.message || resData.error || "Failed to loa
             <div className="admin-tableScroll">
               <div className="admin-table">
                 <div className="admin-row admin-rowHead">
-  <div>ID</div>
-  <div>Players</div>
-  <div>Court</div>
-  <div>Date</div>
-  <div>Start - End</div>
-  <div>Total</div>
-  <div>Status</div>
-</div>
+                  <div>ID</div>
+                  <div>Players</div>
+                  <div>Court</div>
+                  <div>Date</div>
+                  <div>Start - End</div>
+                  <div>Total</div>
+                  <div>Status</div>
+                </div>
 
                 {filteredReservations.length === 0 ? (
                   <div className="admin-empty">No results found.</div>

@@ -44,16 +44,14 @@ export default function AdminReservations() {
     },
   ]);
 
-  // filters
+  
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("");
   const [sortBy, setSortBy] = useState("newest");
 
-  // ✅ FILTER PANEL
   const [filterOpen, setFilterOpen] = useState(false);
 
-  // ✅ MODALS
   const [cancelTarget, setCancelTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
@@ -119,7 +117,6 @@ export default function AdminReservations() {
     (dateFilter ? 1 : 0) +
     (sortBy !== "newest" ? 1 : 0);
 
-  // ✅ actions
   const cancelReservation = (bookingId) => {
     setReservations((prev) =>
       prev.map((x) => (x.bookingId === bookingId ? { ...x, status: "Cancelled" } : x))

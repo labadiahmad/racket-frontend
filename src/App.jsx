@@ -8,7 +8,7 @@ import OwnerLayout from "./pages/ownerLayout.jsx";
 /* Auth */
 import Login from "./pages/Login";
 import Signup from "./pages/Signup.jsx";
-import OwnerSignup from "./pages/ownerSignup.jsx";
+import OwnerSignup from "./pages/OwnerSignup.jsx";
 
 /* User pages */
 import Home from "./pages/Home";
