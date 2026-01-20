@@ -39,7 +39,6 @@ export default function Login({ setUser, setOwner }) {
       return;
     }
 
-    // after successful response:
 const logged = data.user || data;
 const role = String(logged?.role || "user").toLowerCase();
 

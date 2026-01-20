@@ -124,7 +124,7 @@ export default function OwnerCourts() {
 
   const filtered = courts.filter((c) => {
     const name = String(c.name || "").toLowerCase();
-    const t = String(c.type || "").toLowerCase(); // indoor/outdoor (or anything your backend returns)
+    const t = String(c.type || "").toLowerCase(); 
     const surface = String(c.surface || "").toLowerCase();
 
     const matchesText = !s || name.includes(s) || t.includes(s) || surface.includes(s);
@@ -280,7 +280,6 @@ export default function OwnerCourts() {
         {/* CARDS */}
         <div className="act-grid">
           {filtered.map((c) => {
-            // Try to use backend image field if you have it
             const cover =
               fileUrl(c.cover_url || c.image_url || "") || "";
 
